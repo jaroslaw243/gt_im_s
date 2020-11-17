@@ -33,7 +33,7 @@ img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 
 et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

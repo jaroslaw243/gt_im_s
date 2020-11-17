@@ -14,13 +14,29 @@ def region_segmentation_cost(image, segmentation, constant):
     return data_fidelity_term + (constant ** 2) * smoothness_term
 
 
+def boundary_segmentation_cost(image, contour):
+    b_cost = 0
+    for i in range(len(contour[0])):
+        x = contour[0][i][0][0]
+        y = contour[0][i][0][1]
+        b_cost += image[x, y]
+    return b_cost
+
+
 img = cv2.imread('test_circle.png', 0)
 
-gaussian_noise = np.zeros((img.shape[0], img.shape[1]), dtype=np.uint8)
-cv2.randn(gaussian_noise, 80, 25)
-img_noise = img + gaussian_noise
+gaussian_noise = np.random.normal(0, 25, size=(img.shape[0], img.shape[1]))
+
+img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
+img_noise_temp[img_noise_temp > 255] = 255
+img_noise_temp[img_noise_temp < 0] = 0
+img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F)
+
+et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINARY)
+contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
 ret, best_img_seg = cv2.threshold(img_noise, 100, 1, cv2.THRESH_BINARY)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
@@ -47,11 +63,16 @@ ax[1].set_title(f'Best segmentation (cost {min_cost})')
 ax[2].imshow(worst_img_seg, cmap='gray')
 ax[2].set_title(f'Worst segmentation (cost {max_cost})')
 
-fig2, ax2 = plt.subplots(1, 2)
+fig2, ax2 = plt.subplots(1, 3)
 plt.setp(ax2, xticks=[], yticks=[])
 ax2[0].imshow(img_noise, cmap='gray')
 ax2[0].set_title('Original')
 ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
+
+cv2.drawContours(img_noise, contours, -1, 255, 3)
+
+ax2[2].imshow(img_noise, cmap='gray')
+ax2[2].set_title(f'Contour (cost {boundary_cost})')
 
 plt.show()

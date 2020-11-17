@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
+import copy
 
 
 def region_segmentation_cost(image, segmentation, constant):
@@ -38,6 +39,9 @@ et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINA
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
+img_contour = copy.copy(img_noise)
+cv2.drawContours(img_contour, contours, -1, 255, 3)
+
 ret, best_img_seg = cv2.threshold(img_noise, 100, 1, cv2.THRESH_BINARY)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 worst_img_seg = best_img_seg
@@ -69,10 +73,7 @@ ax2[0].imshow(img_noise, cmap='gray')
 ax2[0].set_title('Original')
 ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
-
-cv2.drawContours(img_noise, contours, -1, 255, 3)
-
-ax2[2].imshow(img_noise, cmap='gray')
+ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Contour (cost {boundary_cost})')
 
 plt.show()

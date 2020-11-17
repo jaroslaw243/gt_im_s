@@ -36,11 +36,18 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F)
 
 et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINARY)
-contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
+
+et2, img_cn2 = cv2.threshold(img, 150, 1, cv2.THRESH_BINARY)
+contours2, hierarchy2 = cv2.findContours(img_cn2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+boundary_cost2 = boundary_segmentation_cost(img_gradient, contours2)
 
 img_contour = copy.copy(img_noise)
 cv2.drawContours(img_contour, contours, -1, 255, 3)
+
+img_contour2 = copy.copy(img_noise)
+cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
 ret, best_img_seg = cv2.threshold(img_noise, 100, 1, cv2.THRESH_BINARY)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
@@ -67,7 +74,7 @@ ax[1].set_title(f'Best segmentation (cost {min_cost})')
 ax[2].imshow(worst_img_seg, cmap='gray')
 ax[2].set_title(f'Worst segmentation (cost {max_cost})')
 
-fig2, ax2 = plt.subplots(1, 3)
+fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])
 ax2[0].imshow(img_noise, cmap='gray')
 ax2[0].set_title('Original')
@@ -75,5 +82,7 @@ ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
 ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Contour (cost {boundary_cost})')
+ax2[3].imshow(img_contour2, cmap='gray')
+ax2[3].set_title(f'Contour (cost {boundary_cost2})')
 
 plt.show()

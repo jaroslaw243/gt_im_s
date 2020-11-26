@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from matplotlib import pyplot as plt
+import matplotlib
+import matplotlib.pyplot as plt
 import copy
 
 
@@ -64,6 +65,8 @@ for tr in range(140, 210, 10):
     if cost > max_cost:
         max_cost = cost
         worst_img_seg = img_seg
+
+matplotlib.use('TkAgg')
 
 fig, ax = plt.subplots(1, 3)
 plt.setp(ax, xticks=[], yticks=[])

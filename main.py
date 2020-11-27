@@ -82,9 +82,8 @@ min_cost = region_segmentation_cost(best_img_seg)
 super_jajo = grad(region_segmentation_cost)
 worst_img_seg = best_img_seg
 max_cost = min_cost
-for tr in range(140, 210, 10):
-    ret, img_seg = cv2.threshold(img_noise, tr, 1, cv2.THRESH_BINARY)
-    best_img_seg -= super_jajo(np.array(img_seg, dtype=np.float))
+for i in range(1, 50):
+    best_img_seg -= super_jajo(np.array(best_img_seg, dtype=np.float))
 
 print(best_img_seg)
 

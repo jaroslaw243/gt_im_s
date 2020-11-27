@@ -27,14 +27,15 @@ def boundary_segmentation_cost(image, contour):
 
 img = cv2.imread('test_circle.png', 0)
 
-gaussian_noise = np.random.normal(0, 25, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 20, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_16S, ksize=5)
+img_gradient = cv2.convertScaleAbs(img_gradient)
 
 et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

@@ -40,16 +40,16 @@ def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j,
     return data_fidelity_term + (constant ** 2) * smoothness_term
 
 
-def gradient_descent(image, w1,  neighborhood_size, max_iteration=50):
+def gradient_descent(image, w1,  neighborhood_size, smoothness_const, max_iteration=50):
     w = copy.copy(w1)
     dims = w.shape
     new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
     image = np.array(np.pad(image, neighborhood_size, 'edge'), dtype=np.int32)
     for x in range(neighborhood_size, dims[0]):
         for y in range(neighborhood_size, dims[1]):
-            current_energy = region_segmentation_cost_clique(image, new_w, 20, neighborhood_size, x, y)
+            current_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y)
 
-            new_energy = region_segmentation_cost_clique(image, new_w, 20, neighborhood_size, x, y, True)
+            new_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y, True)
 
             if new_energy < current_energy:
                 if w[x - neighborhood_size, y - neighborhood_size] == 1:
@@ -62,9 +62,9 @@ def gradient_descent(image, w1,  neighborhood_size, max_iteration=50):
     return w
 
 
-img = cv2.imread('7188.jpg', 0)
+img = cv2.imread('test_circle.png', 0)
 
-gaussian_noise = np.random.normal(0, 25, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 30, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
@@ -89,7 +89,7 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
 
 ret, best_img_seg = cv2.threshold(img_noise, 180, 1, cv2.THRESH_BINARY)
-gd_segmentation = gradient_descent(img_noise, best_img_seg, 1)
+gd_segmentation = gradient_descent(img_noise, best_img_seg, 1, 20)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 
 

@@ -27,27 +27,26 @@ def boundary_segmentation_cost(image, contour):
 
 
 def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j, change=False):
-    segmentation = np.int8(np.pad(segmentation, n_size, 'edge'))
-    image = np.int8(np.pad(image, n_size, 'edge'))
+    segmentation_clique = copy.copy(segmentation[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)])
+    image_clique = image[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)]
     if change:
-        if segmentation[i, j] == 1:
-            segmentation[i, j] = 0
+        if segmentation_clique[n_size, n_size] == 1:
+            segmentation_clique[n_size, n_size] = 0
         else:
-            segmentation[i, j] = 1
+            segmentation_clique[n_size, n_size] = 1
 
-    data_fidelity_term = np.sum(np.square(image[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)] -
-                                          segmentation[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)]))
-    smoothness_term = np.sum(np.square(segmentation[i-n_size:i+(n_size + 1),
-                                       j-n_size:j+(n_size + 1)] - segmentation[i, j]))
+    data_fidelity_term = np.sum(np.square(image_clique - segmentation_clique))
+    smoothness_term = np.sum(np.square(segmentation_clique - segmentation_clique[n_size, n_size]))
     return data_fidelity_term + (constant ** 2) * smoothness_term
 
 
 def gradient_descent(image, w1,  neighborhood_size, max_iteration=50):
     w = copy.copy(w1)
     dims = w.shape
-    new_w = copy.copy(w)
-    for x in range(dims[0]):
-        for y in range(dims[1]):
+    new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
+    image = np.array(np.pad(image, neighborhood_size, 'edge'), dtype=np.int32)
+    for x in range(neighborhood_size, dims[0]):
+        for y in range(neighborhood_size, dims[1]):
             current_energy = region_segmentation_cost_clique(image, new_w, 20, neighborhood_size, x, y)
 
             new_energy = region_segmentation_cost_clique(image, new_w, 20, neighborhood_size, x, y, True)

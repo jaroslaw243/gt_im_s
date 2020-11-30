@@ -62,7 +62,7 @@ def gradient_descent(image, w1,  neighborhood_size, max_iteration=50):
     return w
 
 
-img = cv2.imread('test_circle.png', 0)
+img = cv2.imread('7188.jpg', 0)
 
 gaussian_noise = np.random.normal(0, 25, size=(img.shape[0], img.shape[1]))
 

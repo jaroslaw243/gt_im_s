@@ -45,8 +45,8 @@ def gradient_descent(image, w1,  neighborhood_size, smoothness_const, max_iterat
     dims = w.shape
     new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
     image = np.array(np.pad(image, neighborhood_size, 'edge'), dtype=np.int32)
-    for x in range(neighborhood_size, dims[0]):
-        for y in range(neighborhood_size, dims[1]):
+    for x in range(neighborhood_size, dims[0] + neighborhood_size):
+        for y in range(neighborhood_size, dims[1] + neighborhood_size):
             current_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y)
 
             new_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y, True)
@@ -62,7 +62,7 @@ def gradient_descent(image, w1,  neighborhood_size, smoothness_const, max_iterat
     return w
 
 
-img = cv2.imread('test_circle.png', 0)
+img = cv2.imread('7188.jpg', 0)
 
 gaussian_noise = np.random.normal(0, 30, size=(img.shape[0], img.shape[1]))
 

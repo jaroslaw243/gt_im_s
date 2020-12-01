@@ -62,7 +62,7 @@ def gradient_descent(image, w1,  neighborhood_size, smoothness_const, max_iterat
     return w
 
 
-img = cv2.imread('7188.jpg', 0)
+img = cv2.imread('test_circle.png', 0)
 
 gaussian_noise = np.random.normal(0, 30, size=(img.shape[0], img.shape[1]))
 
@@ -87,9 +87,10 @@ cv2.drawContours(img_contour, contours, -1, 255, 3)
 img_contour2 = copy.copy(img_noise)
 cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
-
-ret, best_img_seg = cv2.threshold(img_noise, 180, 1, cv2.THRESH_BINARY)
-gd_segmentation = gradient_descent(img_noise, best_img_seg, 1, 20)
+init_tr = 180
+clique_size = 1
+ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
+gd_segmentation = gradient_descent(img_noise, best_img_seg, clique_size, 20)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 
 
@@ -98,9 +99,9 @@ plt.setp(ax, xticks=[], yticks=[])
 ax[0].imshow(img_noise, cmap='gray')
 ax[0].set_title('Original')
 ax[1].imshow(best_img_seg, cmap='gray')
-ax[1].set_title('Initial segmentation')
+ax[1].set_title(f'Initial segmentation (threshold {init_tr})')
 ax[2].imshow(gd_segmentation, cmap='gray')
-ax[2].set_title('Gradient descent')
+ax[2].set_title(f'Gradient descent (neighborhood size {clique_size})')
 
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])

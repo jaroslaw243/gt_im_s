@@ -40,7 +40,7 @@ def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j,
     return data_fidelity_term + (constant ** 2) * smoothness_term
 
 
-def gradient_descent(image, w1,  neighborhood_size, smoothness_const, max_iteration=50):
+def iterated_conditional_modes(image, w1,  neighborhood_size, smoothness_const):
     w = copy.copy(w1)
     dims = w.shape
     new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
@@ -90,7 +90,9 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 init_tr = 180
 clique_size = 1
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
-gd_segmentation = gradient_descent(img_noise, best_img_seg, clique_size, 20)
+gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, 20)
+for i in range(5):
+    gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, 20)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 
 

@@ -91,7 +91,7 @@ init_tr = 180
 clique_size = 1
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, 20)
-for i in range(5):
+for iteration in range(5):
     gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, 20)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 
@@ -103,7 +103,7 @@ ax[0].set_title('Original')
 ax[1].imshow(best_img_seg, cmap='gray')
 ax[1].set_title(f'Initial segmentation (threshold {init_tr})')
 ax[2].imshow(gd_segmentation, cmap='gray')
-ax[2].set_title(f'Gradient descent (neighborhood size {clique_size})')
+ax[2].set_title(f'ICM (neighborhood size {clique_size})')
 
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])

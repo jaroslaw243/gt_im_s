@@ -40,6 +40,37 @@ def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j,
     return data_fidelity_term + (constant ** 2) * smoothness_term
 
 
+def region_segmentation_cost_clique_boundary_contribution(segmentation, contour, alpha, n_size, i, j, change=False):
+    segmentation_clique = copy.copy(segmentation)
+    if change:
+        if segmentation_clique[i, j] == 1:
+            segmentation_clique[i, j] = 0
+        else:
+            segmentation_clique[i, j] = 1
+
+    u = 0
+    v = 0
+    boundary_seg = np.zeros((n_size * 2 + 1, n_size * 2 + 1), dtype=np.int16)
+    sum_in = 0
+    sum_out = 0
+    for a in range(i - n_size, i + n_size + 1):
+        for b in range(j - n_size, j + n_size + 1):
+            if cv2.pointPolygonTest(contour[0], (a, b), False) < 1:
+                v += segmentation_clique[i, j]
+            else:
+                u += segmentation_clique[i, j]
+                boundary_seg[(a - i) + n_size, (b - j) + n_size] = 1
+
+    for c in range(n_size + 1):
+        for d in range(n_size + 1):
+            if boundary_seg[c, d] == 1:
+                sum_in += np.square(segmentation_clique[c + i, d + j] - u)
+            else:
+                sum_out += np.square(segmentation_clique[c + i, d + j] - v)
+
+    return alpha * (sum_in + sum_out)
+
+
 def iterated_conditional_modes(image, w1,  neighborhood_size, smoothness_const):
     w = copy.copy(w1)
     dims = w.shape
@@ -62,7 +93,33 @@ def iterated_conditional_modes(image, w1,  neighborhood_size, smoothness_const):
     return w
 
 
-img = cv2.imread('test_circle.png', 0)
+def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size, smoothness_const, alpha):
+    w = copy.copy(w1)
+    dims = w.shape
+    new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
+    image = np.array(np.pad(image, neighborhood_size, 'edge'), dtype=np.int32)
+    for x in range(neighborhood_size, dims[0] + neighborhood_size):
+        for y in range(neighborhood_size, dims[1] + neighborhood_size):
+            current_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y)\
+                             + region_segmentation_cost_clique_boundary_contribution(new_w, contour, alpha,
+                                                                                     neighborhood_size, x, y)
+
+            new_energy = region_segmentation_cost_clique(image, new_w, smoothness_const, neighborhood_size, x, y, True)\
+                         + region_segmentation_cost_clique_boundary_contribution(new_w, contour, alpha,
+                                                                                 neighborhood_size, x, y, True)
+
+            if new_energy < current_energy:
+                if w[x - neighborhood_size, y - neighborhood_size] == 1:
+                    w[x - neighborhood_size, y - neighborhood_size] = 0
+                else:
+                    w[x - neighborhood_size, y - neighborhood_size] = 1
+
+            # if np.abs(new_energy - current_energy) < 1:
+            #     return w
+    return w
+
+
+img = cv2.imread('7188.jpg', 0)
 
 gaussian_noise = np.random.normal(0, 30, size=(img.shape[0], img.shape[1]))
 
@@ -73,7 +130,7 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 
-et, img_cn = cv2.threshold(cv2.imread('contour.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('contour_dorian.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
@@ -89,21 +146,24 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
 init_tr = 180
 clique_size = 1
-ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
+ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
 gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, 20)
-for i in range(5):
-    gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, 20)
+gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, best_img_seg, contours, clique_size, 20, 4)
+for iteration in range(3):
+    gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, gd_segmentation2, contours, clique_size, 20, 4)
 min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
 
 
-fig, ax = plt.subplots(1, 3)
+fig, ax = plt.subplots(1, 4)
 plt.setp(ax, xticks=[], yticks=[])
 ax[0].imshow(img_noise, cmap='gray')
 ax[0].set_title('Original')
 ax[1].imshow(best_img_seg, cmap='gray')
 ax[1].set_title(f'Initial segmentation (threshold {init_tr})')
 ax[2].imshow(gd_segmentation, cmap='gray')
-ax[2].set_title(f'Gradient descent (neighborhood size {clique_size})')
+ax[2].set_title(f'ICM (neighborhood size {clique_size})')
+ax[3].imshow(gd_segmentation2, cmap='gray')
+ax[3].set_title(f'ICM interlaced (neighborhood size {clique_size})')
 
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])

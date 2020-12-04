@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
-from autograd import grad
+# from autograd import grad
 from matplotlib import pyplot as plt
 import copy
+import time
 
 
 def region_segmentation_cost(image, segmentation, constant):
@@ -143,8 +144,11 @@ init_tr = 180
 clique_size = 1
 sm_const = 20
 scaling_const = 5
-max_iterations = 5
+max_iterations = 3
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
+
+start_time = time.time()
+
 gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, sm_const)
 gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, best_img_seg, contours, clique_size, sm_const,
                                                          scaling_const)
@@ -152,7 +156,7 @@ for iteration in range(max_iterations):
     gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, sm_const)
     gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, gd_segmentation2, contours, clique_size,
                                                              sm_const, scaling_const)
-min_cost = region_segmentation_cost(img_noise, best_img_seg, 2)
+final_time = time.time() - start_time
 
 
 fig, ax = plt.subplots(1, 4)
@@ -164,7 +168,7 @@ ax[1].set_title(f'Initial segmentation (threshold {init_tr})')
 ax[2].imshow(gd_segmentation, cmap='gray')
 ax[2].set_title(f'ICM ({max_iterations} iterations)')
 ax[3].imshow(gd_segmentation2, cmap='gray')
-ax[3].set_title(f'ICM interlaced ({max_iterations} iterations)')
+ax[3].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time:.2f}s)')
 
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])

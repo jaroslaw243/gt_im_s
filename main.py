@@ -54,11 +54,7 @@ def region_segmentation_cost_clique_interlaced(image, segmentation, constant, co
     data_fidelity_term = np.sum(np.square(image_clique - segmentation_clique))
     smoothness_term = np.sum(np.square(segmentation_clique - segmentation_clique[n_size, n_size]))
 
-    boundary_seg = np.zeros((n_size * 2 + 1, n_size * 2 + 1), dtype=np.int16)
-    for a in range((n_size * 2) + 1):
-        for b in range((n_size * 2) + 1):
-            if cv2.pointPolygonTest(contour[0], (a + i, b + j), False) == 1:
-                boundary_seg[a, b] = 1
+    boundary_seg = contour[i - n_size:i + (n_size + 1), j - n_size:j + (n_size + 1)]
 
     u = np.sum(segmentation_clique[boundary_seg == 1])
     v = np.sum(segmentation_clique[boundary_seg == 0])
@@ -96,12 +92,14 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     dims = w.shape
     new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
     image = np.array(np.pad(image, neighborhood_size, 'edge'), dtype=np.int32)
+    contour_matrix = np.zeros(dims, dtype=np.int32)
+    contour_matrix = np.pad(cv2.drawContours(contour_matrix, contour, -1, 1, -1), neighborhood_size, 'edge')
     for x in range(neighborhood_size, dims[0] + neighborhood_size):
         for y in range(neighborhood_size, dims[1] + neighborhood_size):
-            current_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour,
+            current_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour_matrix,
                                                                         alpha, neighborhood_size, x, y)
 
-            new_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour,
+            new_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour_matrix,
                                                                     alpha, neighborhood_size, x, y, True)
 
             if new_energy < current_energy:
@@ -143,7 +141,7 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 init_tr = 180
 clique_size = 1
 sm_const = 20
-scaling_const = 5
+scaling_const = 1
 max_iterations = 3
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
 

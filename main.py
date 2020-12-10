@@ -141,7 +141,7 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 init_tr = 180
 clique_size = 1
 sm_const = 20
-scaling_const = 1
+scaling_const = 5
 max_iterations = 3
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
 
@@ -151,7 +151,7 @@ gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_siz
 gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, best_img_seg, contours, clique_size, sm_const,
                                                          scaling_const)
 for iteration in range(max_iterations):
-    gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, sm_const)
+    gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, sm_const)
     gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, gd_segmentation2, contours, clique_size,
                                                              sm_const, scaling_const)
 final_time = time.time() - start_time

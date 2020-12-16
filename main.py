@@ -6,6 +6,27 @@ import copy
 import time
 
 
+def fourier_parametrization_to_indices(coefficients, accuracy):
+    k_max = int((coefficients.size - 2) / 4)
+
+    a0_c0 = coefficients[0:2]
+    contour = []
+    for t in np.arange(0, np.pi * 2, accuracy):
+        second_term = np.zeros((1, 2), dtype=np.float)
+        coef_indices = np.array((0, 1, 2, 3), dtype=np.uint16)
+
+        for k in range(1, k_max + 1):
+            second_term += np.absolute(
+                np.matmul(np.array([coefficients[coef_indices[0:2]], coefficients[coef_indices[2:4]]], dtype=np.float),
+                          np.array([np.cos(k * t), np.sin(k * t)], dtype=np.float)))
+            coef_indices += 4
+        indices = np.rint(a0_c0 + second_term)
+
+        contour.append(indices)
+
+    return [np.array(contour, dtype=np.int32)]
+
+
 def region_segmentation_cost(image, segmentation, constant):
     data_fidelity_term = np.sum(np.square(image - segmentation))
     smoothness_term = 0
@@ -28,8 +49,8 @@ def boundary_segmentation_cost(image, contour):
 
 
 def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j, change=False):
-    segmentation_clique = copy.copy(segmentation[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)])
-    image_clique = image[i-n_size:i+(n_size + 1), j-n_size:j+(n_size + 1)]
+    segmentation_clique = copy.copy(segmentation[i - n_size:i + (n_size + 1), j - n_size:j + (n_size + 1)])
+    image_clique = image[i - n_size:i + (n_size + 1), j - n_size:j + (n_size + 1)]
     if change:
         if segmentation_clique[n_size, n_size] == 1:
             segmentation_clique[n_size, n_size] = 0
@@ -62,7 +83,7 @@ def region_segmentation_cost_clique_interlaced(image, segmentation, constant, co
     return (data_fidelity_term + (constant ** 2) * smoothness_term) + (alpha * (sum_in + sum_out))
 
 
-def iterated_conditional_modes(image, w1,  neighborhood_size, smoothness_const):
+def iterated_conditional_modes(image, w1, neighborhood_size, smoothness_const):
     w = copy.copy(w1)
     dims = w.shape
     new_w = np.array(np.pad(w, neighborhood_size, 'edge'), dtype=np.int32)
@@ -93,15 +114,17 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     contour_matrix = np.pad(cv2.drawContours(contour_matrix, contour, -1, 1, -1), neighborhood_size, 'edge')
 
     expected_val_in = np.bincount(new_w[contour_matrix == 1]).argmax()
-    expected_val_out = np.bincount(new_w[contour_matrix == 0]).argmax()
+    expected_val_out = np.logical_not(expected_val_in)
 
     for x in range(neighborhood_size, dims[0] + neighborhood_size):
         for y in range(neighborhood_size, dims[1] + neighborhood_size):
             current_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour_matrix,
-                                                                        alpha, neighborhood_size, expected_val_in, expected_val_out, x, y)
+                                                                        alpha, neighborhood_size, expected_val_in,
+                                                                        expected_val_out, x, y)
 
             new_energy = region_segmentation_cost_clique_interlaced(image, new_w, smoothness_const, contour_matrix,
-                                                                    alpha, neighborhood_size, expected_val_in, expected_val_out, x, y, True)
+                                                                    alpha, neighborhood_size, expected_val_in,
+                                                                    expected_val_out, x, y, True)
 
             if new_energy < current_energy:
                 if w[x - neighborhood_size, y - neighborhood_size] == 1:
@@ -112,7 +135,7 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
-img = cv2.imread('test_circle2.png', 0)
+img = cv2.imread('IMD003.bmp', 0)
 
 gaussian_noise = np.random.normal(0, 70, size=(img.shape[0], img.shape[1]))
 
@@ -123,7 +146,7 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 
-et, img_cn = cv2.threshold(cv2.imread('test_circle3.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('IMD003_cn.bmp', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
@@ -137,10 +160,14 @@ cv2.drawContours(img_contour, contours, -1, 255, 3)
 img_contour2 = copy.copy(img_noise)
 cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
+contour_from_fourier = fourier_parametrization_to_indices(np.array((20, 40, 3, 4, 5, 6), dtype=np.float), 0.1)
+img_contour3 = copy.copy(img_noise)
+cv2.drawContours(img_contour3, contour_from_fourier, -1, 255, 3)
+
 init_tr = 180
 clique_size = 1
 sm_const = 20
-scaling_const = 2000
+scaling_const = 800
 max_iterations = 3
 ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
 
@@ -155,7 +182,6 @@ for iteration in range(max_iterations):
                                                              sm_const, scaling_const)
 final_time = time.time() - start_time
 
-
 fig, ax = plt.subplots(1, 5)
 plt.setp(ax, xticks=[], yticks=[])
 ax[0].imshow(img, cmap='gray')
@@ -169,7 +195,7 @@ ax[3].set_title(f'ICM ({max_iterations} iterations)')
 ax[4].imshow(gd_segmentation2, cmap='gray')
 ax[4].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time:.2f}s)')
 
-fig2, ax2 = plt.subplots(1, 4)
+fig2, ax2 = plt.subplots(1, 5)
 plt.setp(ax2, xticks=[], yticks=[])
 ax2[0].imshow(img_noise, cmap='gray')
 ax2[0].set_title('Original')
@@ -179,5 +205,7 @@ ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Contour (cost {boundary_cost})')
 ax2[3].imshow(img_contour2, cmap='gray')
 ax2[3].set_title(f'Contour (cost {boundary_cost2})')
+ax2[4].imshow(img_contour3, cmap='gray')
+ax2[4].set_title('Contour from Fourier parametrization')
 
 plt.show()

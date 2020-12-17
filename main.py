@@ -1,6 +1,8 @@
 import cv2
-import numpy as np
-# from autograd import grad
+# import numpy as np
+import autograd.numpy as np
+from autograd import grad
+from pyefd import elliptic_fourier_descriptors
 from matplotlib import pyplot as plt
 import copy
 import time
@@ -11,14 +13,18 @@ def fourier_parametrization_to_indices(coefficients, accuracy):
 
     a0_c0 = coefficients[0:2]
     contour = []
-    for t in np.arange(0, np.pi * 2, accuracy):
+    for t in np.arange(0, 2 * np.pi, accuracy):
         second_term = np.zeros((1, 2), dtype=np.float)
-        coef_indices = np.array((0, 1, 2, 3), dtype=np.uint16)
+        coef_indices = np.array((2, 3, 4, 5), dtype=np.uint16)
 
         for k in range(1, k_max + 1):
-            second_term += np.absolute(
-                np.matmul(np.array([coefficients[coef_indices[0:2]], coefficients[coef_indices[2:4]]], dtype=np.float),
-                          np.array([np.cos(k * t), np.sin(k * t)], dtype=np.float)))
+            a_n = coefficients[coef_indices[0]]
+            b_n = coefficients[coef_indices[1]]
+            c_n = coefficients[coef_indices[2]]
+            d_n = coefficients[coef_indices[3]]
+            second_term += np.matmul(
+                np.array([[a_n, b_n], [c_n, d_n]], dtype=np.float),
+                np.array([np.cos(k * t), np.sin(k * t)], dtype=np.float))
             coef_indices += 4
         indices = np.rint(a0_c0 + second_term)
 
@@ -135,6 +141,12 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
+def boundary_finding(coefficients):
+    acc = 0.01
+    img_gradient_fn = cv2.Laplacian(img, cv2.CV_64F, ksize=5)
+    return boundary_segmentation_cost(img_gradient_fn, fourier_parametrization_to_indices(coefficients, acc))
+
+
 img = cv2.imread('IMD003.bmp', 0)
 
 gaussian_noise = np.random.normal(0, 70, size=(img.shape[0], img.shape[1]))
@@ -160,9 +172,18 @@ cv2.drawContours(img_contour, contours, -1, 255, 3)
 img_contour2 = copy.copy(img_noise)
 cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
-contour_from_fourier = fourier_parametrization_to_indices(np.array((20, 40, 3, 4, 5, 6), dtype=np.float), 0.1)
+
+init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=1)[0]
+init_fourier_coeffs2 = np.append([240, 160], init_fourier_coeffs)
+
+training_gradient_fun = grad(boundary_finding)
+for iteration in range(10):
+    init_fourier_coeffs2 -= training_gradient_fun(init_fourier_coeffs2) * 0.1
+
+contour_from_fourier = fourier_parametrization_to_indices(init_fourier_coeffs2, 0.01)
 img_contour3 = copy.copy(img_noise)
 cv2.drawContours(img_contour3, contour_from_fourier, -1, 255, 3)
+
 
 init_tr = 180
 clique_size = 1
@@ -176,7 +197,7 @@ start_time = time.time()
 gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, sm_const)
 gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, best_img_seg, contours, clique_size, sm_const,
                                                          scaling_const)
-for iteration in range(max_iterations):
+for iteration2 in range(max_iterations):
     gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, sm_const)
     gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, gd_segmentation2, contours, clique_size,
                                                              sm_const, scaling_const)

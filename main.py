@@ -147,7 +147,7 @@ def boundary_finding(coefficients):
     return boundary_segmentation_cost(img_gradient_fn, fourier_parametrization_to_indices(coefficients, acc))
 
 
-img = cv2.imread('IMD003.bmp', 0)
+img = cv2.imread('test_circle2.png', 0)
 
 gaussian_noise = np.random.normal(0, 70, size=(img.shape[0], img.shape[1]))
 
@@ -158,7 +158,7 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 
-et, img_cn = cv2.threshold(cv2.imread('IMD003_cn.bmp', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('test_circle3.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
@@ -173,8 +173,8 @@ img_contour2 = copy.copy(img_noise)
 cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
 
-init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=1)[0]
-init_fourier_coeffs2 = np.append([240, 160], init_fourier_coeffs)
+init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=2).flatten()
+init_fourier_coeffs2 = np.append([12, 8], init_fourier_coeffs)
 
 training_gradient_fun = grad(boundary_finding)
 for iteration in range(10):

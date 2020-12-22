@@ -1,7 +1,6 @@
 import cv2
-# import numpy as np
-import autograd.numpy as np
-from autograd import grad
+import numpy as np
+from scipy import optimize
 from pyefd import elliptic_fourier_descriptors
 from matplotlib import pyplot as plt
 import copy
@@ -149,7 +148,7 @@ def boundary_finding(coefficients):
 
 img = cv2.imread('test_circle2.png', 0)
 
-gaussian_noise = np.random.normal(0, 70, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 20, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
@@ -174,13 +173,11 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 
 
 init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=2).flatten()
-init_fourier_coeffs2 = np.append([12, 8], init_fourier_coeffs)
+init_fourier_coeffs2 = np.append([40, 30], init_fourier_coeffs)
 
-training_gradient_fun = grad(boundary_finding)
-for iteration in range(10):
-    init_fourier_coeffs2 -= training_gradient_fun(init_fourier_coeffs2) * 0.1
+optimized_fourier_coeffs = optimize.minimize(boundary_finding, x0=init_fourier_coeffs2, method='Nelder-Mead').x
 
-contour_from_fourier = fourier_parametrization_to_indices(init_fourier_coeffs2, 0.01)
+contour_from_fourier = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
 img_contour3 = copy.copy(img_noise)
 cv2.drawContours(img_contour3, contour_from_fourier, -1, 255, 3)
 

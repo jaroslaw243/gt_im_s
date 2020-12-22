@@ -140,10 +140,8 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
-def boundary_finding(coefficients):
-    acc = 0.01
-    img_gradient_fn = cv2.Laplacian(img, cv2.CV_64F, ksize=5)
-    return boundary_segmentation_cost(img_gradient_fn, fourier_parametrization_to_indices(coefficients, acc))
+def boundary_finding(coefficients, *args):
+    return -boundary_segmentation_cost(args[0], fourier_parametrization_to_indices(coefficients, args[1]))
 
 
 img = cv2.imread('test_circle2.png', 0)
@@ -175,11 +173,16 @@ cv2.drawContours(img_contour2, contours2, -1, 255, 3)
 init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=2).flatten()
 init_fourier_coeffs2 = np.append([40, 30], init_fourier_coeffs)
 
-optimized_fourier_coeffs = optimize.minimize(boundary_finding, x0=init_fourier_coeffs2, method='Nelder-Mead').x
+start_time_boundary = time.time()
 
-contour_from_fourier = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
-img_contour3 = copy.copy(img_noise)
-cv2.drawContours(img_contour3, contour_from_fourier, -1, 255, 3)
+optimized_fourier_coeffs = optimize.minimize(boundary_finding, x0=init_fourier_coeffs2, args=(img_gradient, 0.01),
+                                             method='Nelder-Mead', options={'maxiter': 10, 'disp': False}).x
+
+final_time_boundary = time.time() - start_time_boundary
+
+optimized_contour = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
+img_contour_optimized = copy.copy(img_noise)
+cv2.drawContours(img_contour_optimized, optimized_contour, -1, 255, 3)
 
 
 init_tr = 180
@@ -187,18 +190,18 @@ clique_size = 1
 sm_const = 20
 scaling_const = 800
 max_iterations = 3
-ret, best_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
+ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY_INV)
 
-start_time = time.time()
+start_time_region = time.time()
 
-gd_segmentation = iterated_conditional_modes(img_noise, best_img_seg, clique_size, sm_const)
-gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, best_img_seg, contours, clique_size, sm_const,
-                                                         scaling_const)
+region_segmentation = iterated_conditional_modes(img_noise, init_img_seg, clique_size, sm_const)
+region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, init_img_seg, contours, clique_size, sm_const,
+                                                             scaling_const)
 for iteration2 in range(max_iterations):
-    gd_segmentation = iterated_conditional_modes(img_noise, gd_segmentation, clique_size, sm_const)
-    gd_segmentation2 = iterated_conditional_modes_interlaced(img_noise, gd_segmentation2, contours, clique_size,
-                                                             sm_const, scaling_const)
-final_time = time.time() - start_time
+    region_segmentation = iterated_conditional_modes(img_noise, region_segmentation, clique_size, sm_const)
+    region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, contours, clique_size,
+                                                                 sm_const, scaling_const)
+final_time_region = time.time() - start_time_region
 
 fig, ax = plt.subplots(1, 5)
 plt.setp(ax, xticks=[], yticks=[])
@@ -206,12 +209,12 @@ ax[0].imshow(img, cmap='gray')
 ax[0].set_title('Original')
 ax[1].imshow(img_noise, cmap='gray')
 ax[1].set_title('Noisy')
-ax[2].imshow(best_img_seg, cmap='gray')
+ax[2].imshow(init_img_seg, cmap='gray')
 ax[2].set_title(f'Initial segmentation (threshold {init_tr})')
-ax[3].imshow(gd_segmentation, cmap='gray')
+ax[3].imshow(region_segmentation, cmap='gray')
 ax[3].set_title(f'ICM ({max_iterations} iterations)')
-ax[4].imshow(gd_segmentation2, cmap='gray')
-ax[4].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time:.2f}s)')
+ax[4].imshow(region_segmentation2, cmap='gray')
+ax[4].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time_region:.2f}s)')
 
 fig2, ax2 = plt.subplots(1, 5)
 plt.setp(ax2, xticks=[], yticks=[])
@@ -223,7 +226,7 @@ ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Contour (cost {boundary_cost})')
 ax2[3].imshow(img_contour2, cmap='gray')
 ax2[3].set_title(f'Contour (cost {boundary_cost2})')
-ax2[4].imshow(img_contour3, cmap='gray')
-ax2[4].set_title('Contour from Fourier parametrization')
+ax2[4].imshow(img_contour_optimized, cmap='gray')
+ax2[4].set_title(f'Optimized contour (time: {final_time_boundary:.2f}s)')
 
 plt.show()

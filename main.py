@@ -192,15 +192,8 @@ et, img_cn = cv2.threshold(cv2.imread('contour5.png', 0), 125, 1, cv2.THRESH_BIN
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
-et2, img_cn2 = cv2.threshold(img, 150, 1, cv2.THRESH_BINARY)
-contours2, hierarchy2 = cv2.findContours(img_cn2, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-boundary_cost2 = boundary_segmentation_cost(img_gradient, contours2)
-
 img_contour = copy.copy(img_noise)
 cv2.drawContours(img_contour, contours, -1, 255, 1)
-
-img_contour2 = copy.copy(img_noise)
-cv2.drawContours(img_contour2, contours2, -1, 255, 1)
 
 init_tr = 180
 clique_size = 1
@@ -235,7 +228,7 @@ final_time_boundary = time.time() - start_time_boundary
 
 optimized_contour = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
 img_contour_optimized = copy.copy(img_noise)
-cv2.drawContours(img_contour_optimized, optimized_contour, -1, 255, 1)
+cv2.drawContours(img_contour_optimized, optimized_contour, -1, 0, 1)
 
 fig, ax = plt.subplots(1, 5)
 plt.setp(ax, xticks=[], yticks=[])
@@ -250,17 +243,15 @@ ax[3].set_title(f'ICM ({max_iterations} iterations)')
 ax[4].imshow(region_segmentation2, cmap='gray')
 ax[4].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time_region:.2f}s)')
 
-fig2, ax2 = plt.subplots(1, 5)
+fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])
 ax2[0].imshow(img_noise, cmap='gray')
 ax2[0].set_title('Original')
 ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
 ax2[2].imshow(img_contour, cmap='gray')
-ax2[2].set_title(f'Contour (cost {boundary_cost})')
-ax2[3].imshow(img_contour2, cmap='gray')
-ax2[3].set_title(f'Contour (cost {boundary_cost2})')
-ax2[4].imshow(img_contour_optimized, cmap='gray')
-ax2[4].set_title(f'Optimized contour (time: {final_time_boundary:.2f}s)')
+ax2[2].set_title(f'Initial contour (cost {boundary_cost})')
+ax2[3].imshow(img_contour_optimized, cmap='gray')
+ax2[3].set_title(f'Optimized contour (time: {final_time_boundary:.2f}s)')
 
 plt.show()

@@ -105,8 +105,6 @@ def iterated_conditional_modes(image, w1, neighborhood_size, smoothness_const):
                 else:
                     w[x - neighborhood_size, y - neighborhood_size] = 1
 
-            # if np.abs(new_energy - current_energy) < 1:
-            #     return w
     return w
 
 
@@ -140,22 +138,32 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
+def icm_interlaced_wrapped(contour_coeffs):
+    global region_segmentation2
+
+    current_contour = fourier_parametrization_to_indices(contour_coeffs, 0.01)
+
+    region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, current_contour,
+                                                                 clique_size, sm_const, scaling_const)
+
+
 def boundary_finding(coefficients, *args):
     return -boundary_segmentation_cost(args[0], fourier_parametrization_to_indices(coefficients, args[1]))
 
 
 img = cv2.imread('test_circle2.png', 0)
 
-gaussian_noise = np.random.normal(0, 20, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 0, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=1)
+img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
-et, img_cn = cv2.threshold(cv2.imread('test_circle3.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('test_circle4.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 boundary_cost = boundary_segmentation_cost(img_gradient, contours)
 
@@ -164,25 +172,10 @@ contours2, hierarchy2 = cv2.findContours(img_cn2, cv2.RETR_EXTERNAL, cv2.CHAIN_A
 boundary_cost2 = boundary_segmentation_cost(img_gradient, contours2)
 
 img_contour = copy.copy(img_noise)
-cv2.drawContours(img_contour, contours, -1, 255, 3)
+cv2.drawContours(img_contour, contours, -1, 255, 1)
 
 img_contour2 = copy.copy(img_noise)
-cv2.drawContours(img_contour2, contours2, -1, 255, 3)
-
-
-init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=2).flatten()
-init_fourier_coeffs2 = np.append([40, 30], init_fourier_coeffs)
-
-start_time_boundary = time.time()
-
-optimized_fourier_coeffs = optimize.minimize(boundary_finding, x0=init_fourier_coeffs2, args=(img_gradient, 0.01),
-                                             method='Nelder-Mead', options={'maxiter': 10, 'disp': False}).x
-
-final_time_boundary = time.time() - start_time_boundary
-
-optimized_contour = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
-img_contour_optimized = copy.copy(img_noise)
-cv2.drawContours(img_contour_optimized, optimized_contour, -1, 255, 3)
+cv2.drawContours(img_contour2, contours2, -1, 255, 1)
 
 
 init_tr = 180
@@ -197,11 +190,28 @@ start_time_region = time.time()
 region_segmentation = iterated_conditional_modes(img_noise, init_img_seg, clique_size, sm_const)
 region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, init_img_seg, contours, clique_size, sm_const,
                                                              scaling_const)
-for iteration2 in range(max_iterations):
-    region_segmentation = iterated_conditional_modes(img_noise, region_segmentation, clique_size, sm_const)
-    region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, contours, clique_size,
-                                                                 sm_const, scaling_const)
+# for iteration2 in range(max_iterations):
+#     region_segmentation = iterated_conditional_modes(img_noise, region_segmentation, clique_size, sm_const)
+#     region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, contours, clique_size,
+#                                                                  sm_const, scaling_const)
 final_time_region = time.time() - start_time_region
+
+
+init_fourier_coeffs = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=2).flatten()
+init_fourier_coeffs2 = np.append([40, 30], init_fourier_coeffs)
+
+start_time_boundary = time.time()
+
+optimized_fourier_coeffs = optimize.minimize(boundary_finding, x0=init_fourier_coeffs2, args=(img_gradient, 0.01),
+                                             method='Nelder-Mead', options={'maxiter': 10, 'disp': False}, tol=10000,
+                                             callback=icm_interlaced_wrapped).x
+
+final_time_boundary = time.time() - start_time_boundary
+
+optimized_contour = fourier_parametrization_to_indices(optimized_fourier_coeffs, 0.01)
+img_contour_optimized = copy.copy(img_noise)
+cv2.drawContours(img_contour_optimized, optimized_contour, -1, 255, 1)
+
 
 fig, ax = plt.subplots(1, 5)
 plt.setp(ax, xticks=[], yticks=[])

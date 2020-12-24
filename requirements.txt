@@ -1,4 +1,5 @@
 numpy==1.19.0
 opencv-python
 matplotlib
-autograd
+scipy
+pyefd

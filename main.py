@@ -77,7 +77,7 @@ def boundary_segmentation_cost_interlaced(image, contour, segmentation, beta):
 
     region_module_influence = np.sum(segmentation[contour_matrix == 1])
 
-    return full_b_cost + (beta * region_module_influence)
+    return b_cost + (beta * region_module_influence)
 
 
 def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j, change=False):
@@ -195,7 +195,7 @@ def boundary_finding_interlaced(coefficients, *args):
 
 img = cv2.imread('test_complex.png', 0)
 
-gaussian_noise = np.random.normal(0, 0, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 150, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
@@ -205,28 +205,28 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
-et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('contour_complex3.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 M = cv2.moments(img_cn)
 
 init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(contours[0])), dtype=np.float)
-init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=8,
+init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=18,
                                                                normalize=False)
 
 img_contour = copy.copy(img)
 cv2.drawContours(img_contour,
                  reconstructed_contour_to_opencv_contour(reconstruct_contour(locus=init_fourier_coeffs_first_part,
                                                                              coeffs=init_fourier_coeffs_second_part,
-                                                                             num_points=1000)), -1, 0, 1)
+                                                                             num_points=10000)), -1, 0, 1)
 
 init_tr = 180
 clique_size = 1
 sm_const = 15
-scaling_const_alpha = 0
-scaling_const_beta = 0
+scaling_const_alpha = 500
+scaling_const_beta = 2500
 max_iterations = 10
-p2c_acc = 1000
+p2c_acc = 10000
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 
 start_time_region = time.time()

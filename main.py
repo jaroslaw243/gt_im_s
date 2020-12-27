@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 from scipy import optimize
-from pyefd import elliptic_fourier_descriptors
+from pyefd import elliptic_fourier_descriptors, calculate_dc_coefficients, reconstruct_contour
 from matplotlib import pyplot as plt
 import matplotlib
 import copy
@@ -14,7 +14,7 @@ def fourier_parametrization_to_indices(a0_c0, coefficients, accuracy):
     contour_array = []
     for t in np.arange(0, 2 * np.pi, accuracy):
         second_term = np.zeros((1, 2), dtype=np.float)
-        coef_indices = np.array((2, 3, 4, 5), dtype=np.uint16) - 2
+        coef_indices = np.array((0, 1, 3, 4), dtype=np.uint16)
 
         for k in range(1, k_max + 1):
             a_n = coefficients[coef_indices[0]]
@@ -30,6 +30,14 @@ def fourier_parametrization_to_indices(a0_c0, coefficients, accuracy):
         contour_array.append(indices)
 
     return [np.array(contour_array, dtype=np.int32)]
+
+
+def reconstructed_contour_to_opencv_contour(contour_array):
+    opencv_contour_array = []
+    for ind in range(contour_array.shape[0]):
+        opencv_contour_array.append([np.rint([contour_array[ind, 0], contour_array[ind, 1]])])
+
+    return [np.array(opencv_contour_array, dtype=np.int32)]
 
 
 def region_segmentation_cost(image, segmentation, constant):
@@ -56,7 +64,6 @@ def boundary_segmentation_cost(image, contour):
 def boundary_segmentation_cost_interlaced(image, contour, segmentation, beta):
     global full_b_cost
     b_cost = 0
-    dims = segmentation.shape
 
     for i in range(len(contour[0])):
         x = contour[0][i][0][0]
@@ -65,7 +72,7 @@ def boundary_segmentation_cost_interlaced(image, contour, segmentation, beta):
 
     full_b_cost += b_cost
 
-    contour_matrix = np.zeros(dims, dtype=np.int32)
+    contour_matrix = np.zeros(segmentation.shape, dtype=np.int32)
     contour_matrix = cv2.drawContours(contour_matrix, contour, -1, 1, -1)
 
     region_module_influence = np.sum(segmentation[contour_matrix == 1])
@@ -164,23 +171,29 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
 def icm_interlaced_wrapped(contour_coeffs):
     global region_segmentation2
 
-    current_contour = fourier_parametrization_to_indices(init_fourier_coeffs_first_part, contour_coeffs, 0.001)
+    current_contour = reconstructed_contour_to_opencv_contour(
+        reconstruct_contour(locus=init_fourier_coeffs_first_part, coeffs=np.reshape(contour_coeffs, (-1, 4)),
+                            num_points=p2c_acc))
 
     region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, current_contour,
                                                                  clique_size, sm_const, scaling_const_alpha)
 
 
 def boundary_finding(coefficients, *args):
-    return -boundary_segmentation_cost(args[0], fourier_parametrization_to_indices(args[1], coefficients, args[2]))
+    return -boundary_segmentation_cost(args[0], reconstructed_contour_to_opencv_contour(
+        reconstruct_contour(locus=args[1], coeffs=np.reshape(coefficients, (-1, 4)),
+                            num_points=args[2])))
 
 
 def boundary_finding_interlaced(coefficients, *args):
-    return -boundary_segmentation_cost_interlaced(args[0],
-                                                  fourier_parametrization_to_indices(args[1], coefficients, args[2]),
-                                                  args[3], args[4])
+    current_contour = reconstructed_contour_to_opencv_contour(
+        reconstruct_contour(locus=args[1], coeffs=np.reshape(coefficients, (-1, 4)),
+                            num_points=args[2]))
+
+    return -boundary_segmentation_cost_interlaced(args[0], current_contour, args[3], args[4])
 
 
-img = cv2.imread('test_complex2.png', 0)
+img = cv2.imread('test_complex.png', 0)
 
 gaussian_noise = np.random.normal(0, 0, size=(img.shape[0], img.shape[1]))
 
@@ -192,20 +205,28 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
-et, img_cn = cv2.threshold(cv2.imread('contour_complex.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-boundary_cost = boundary_segmentation_cost(img_gradient, contours)
+
+M = cv2.moments(img_cn)
+
+init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(contours[0])), dtype=np.float)
+init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=8,
+                                                               normalize=False)
 
 img_contour = copy.copy(img)
-cv2.drawContours(img_contour, contours, -1, 0, 1)
+cv2.drawContours(img_contour,
+                 reconstructed_contour_to_opencv_contour(reconstruct_contour(locus=init_fourier_coeffs_first_part,
+                                                                             coeffs=init_fourier_coeffs_second_part,
+                                                                             num_points=1000)), -1, 0, 1)
 
 init_tr = 180
 clique_size = 1
 sm_const = 15
-scaling_const_alpha = 800
-scaling_const_beta = 800
+scaling_const_alpha = 0
+scaling_const_beta = 0
 max_iterations = 10
-p2c_acc = 0.001
+p2c_acc = 1000
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 
 start_time_region = time.time()
@@ -216,16 +237,13 @@ region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, init_img
 
 final_time_region = time.time() - start_time_region
 
-M = cv2.moments(img_cn)
-
-init_fourier_coeffs_first_part = np.array([M["m10"] / M["m00"], M["m01"] / M["m00"]], dtype=np.float)
-init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=18,
-                                                               normalize=False).flatten()
-
 full_b_cost = boundary_segmentation_cost(img_gradient,
-                                         fourier_parametrization_to_indices(init_fourier_coeffs_first_part,
-                                                                            init_fourier_coeffs_second_part,
-                                                                            p2c_acc))
+                                         reconstructed_contour_to_opencv_contour(
+                                             reconstruct_contour(locus=init_fourier_coeffs_first_part,
+                                                                 coeffs=init_fourier_coeffs_second_part,
+                                                                 num_points=p2c_acc)))
+
+boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, contours, region_segmentation2, scaling_const_beta)
 
 start_time_boundary = time.time()
 
@@ -237,10 +255,13 @@ optimized_fourier_coeffs = optimize.minimize(boundary_finding_interlaced, x0=ini
 
 final_time_boundary = time.time() - start_time_boundary
 
-optimized_contour = fourier_parametrization_to_indices(init_fourier_coeffs_first_part, optimized_fourier_coeffs,
-                                                       p2c_acc)
+optimized_contour = reconstructed_contour_to_opencv_contour(
+    reconstruct_contour(locus=init_fourier_coeffs_first_part, coeffs=np.reshape(optimized_fourier_coeffs, (-1, 4)),
+                        num_points=p2c_acc))
 img_contour_optimized = copy.copy(img)
 cv2.drawContours(img_contour_optimized, optimized_contour, -1, 0, 1)
+optimized_boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, optimized_contour, region_segmentation2,
+                                                                scaling_const_beta)
 
 matplotlib.use('TkAgg')
 
@@ -266,6 +287,6 @@ ax2[1].set_title('Gradient')
 ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Initial contour (cost {boundary_cost})')
 ax2[3].imshow(img_contour_optimized, cmap='gray')
-ax2[3].set_title(f'Optimized contour (time: {final_time_boundary:.2f}s)')
+ax2[3].set_title(f'Optimized contour (cost {optimized_boundary_cost}, time: {final_time_boundary:.2f}s)')
 
 plt.show()

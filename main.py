@@ -1,11 +1,10 @@
 import cv2
 import numpy as np
-from scipy import optimize
-from pyefd import elliptic_fourier_descriptors, calculate_dc_coefficients, reconstruct_contour
 from matplotlib import pyplot as plt
 import matplotlib
 import copy
 import time
+import snake
 
 
 def fourier_parametrization_to_indices(a0_c0, coefficients, accuracy):
@@ -40,6 +39,14 @@ def reconstructed_contour_to_opencv_contour(contour_array):
     return [np.array(opencv_contour_array, dtype=np.int32)]
 
 
+def snake_to_opencv_contour(snake_array):
+    opencv_contour_array = []
+    for ind in range(len(snake_array)):
+        opencv_contour_array.append([snake_array[ind]])
+
+    return [np.array(opencv_contour_array, dtype=np.int32)]
+
+
 def region_segmentation_cost(image, segmentation, constant):
     data_fidelity_term = np.sum(np.square(image - segmentation))
     smoothness_term = 0
@@ -62,21 +69,18 @@ def boundary_segmentation_cost(image, contour):
 
 
 def boundary_segmentation_cost_interlaced(image, contour, segmentation, beta):
-    global full_b_cost
     b_cost = 0
 
     contour_unique = np.unique(np.squeeze(contour[0]), axis=0)
     for i in range(contour_unique.shape[0]):
         b_cost += image[contour_unique[i][0], contour_unique[i][1]]
 
-    full_b_cost += b_cost
-
     contour_matrix = np.zeros(segmentation.shape, dtype=np.int32)
     contour_matrix = cv2.drawContours(contour_matrix, contour, -1, 1, -1)
 
     region_module_influence = np.sum(segmentation[contour_matrix == 1])
 
-    return full_b_cost + (beta * region_module_influence)
+    return b_cost + (beta * region_module_influence)
 
 
 def region_segmentation_cost_clique(image, segmentation, constant, n_size, i, j, change=False):
@@ -142,11 +146,8 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     contour_matrix = np.zeros(dims, dtype=np.int32)
     contour_matrix = np.pad(cv2.drawContours(contour_matrix, contour, -1, 1, -1), neighborhood_size, 'edge')
 
-    # expected_val_in = np.bincount(new_w[contour_matrix == 1]).argmax()
-    # expected_val_out = np.logical_not(expected_val_in)
-
-    expected_val_in = 1
-    expected_val_out = 0
+    expected_val_in = np.bincount(new_w[contour_matrix == 1]).argmax()
+    expected_val_out = np.logical_not(expected_val_in)
 
     for x in range(neighborhood_size, dims[0] + neighborhood_size):
         for y in range(neighborhood_size, dims[1] + neighborhood_size):
@@ -167,64 +168,30 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
-def icm_interlaced_wrapped(contour_coeffs):
-    global region_segmentation2
+img = cv2.imread('test_complex3.png', 0)
 
-    current_contour = reconstructed_contour_to_opencv_contour(
-        reconstruct_contour(locus=init_fourier_coeffs_first_part, coeffs=np.reshape(contour_coeffs, (-1, 4)),
-                            num_points=p2c_acc))
-
-    region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2, current_contour,
-                                                                 clique_size, sm_const, scaling_const_alpha)
-
-
-def boundary_finding(coefficients, *args):
-    return -boundary_segmentation_cost(args[0], reconstructed_contour_to_opencv_contour(
-        reconstruct_contour(locus=args[1], coeffs=np.reshape(coefficients, (-1, 4)),
-                            num_points=args[2])))
-
-
-def boundary_finding_interlaced(coefficients, *args):
-    current_contour = reconstructed_contour_to_opencv_contour(
-        reconstruct_contour(locus=args[1], coeffs=np.reshape(coefficients, (-1, 4)),
-                            num_points=args[2]))
-
-    return -boundary_segmentation_cost_interlaced(args[0], current_contour, args[3], args[4])
-
-
-img = cv2.imread('test_complex.png', 0)
-
-gaussian_noise = np.random.normal(0, 0, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 50, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=1)
 img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
 et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-
-init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(contours[0])), dtype=np.float)
-init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=18,
-                                                               normalize=False)
-
 img_contour = copy.copy(img)
-cv2.drawContours(img_contour,
-                 reconstructed_contour_to_opencv_contour(reconstruct_contour(locus=init_fourier_coeffs_first_part,
-                                                                             coeffs=init_fourier_coeffs_second_part,
-                                                                             num_points=2500)), -1, 0, 1)
+cv2.drawContours(img_contour, contours, -1, 0, 1)
 
 init_tr = 180
 clique_size = 1
-sm_const = 15
-scaling_const_alpha = 0
-scaling_const_beta = 0
+sm_const = 30
+scaling_const_alpha = 200
+scaling_const_beta = 2.5
 max_iterations = 10
-p2c_acc = 2500
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 
 start_time_region = time.time()
@@ -235,27 +202,31 @@ region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, init_img
 
 final_time_region = time.time() - start_time_region
 
-full_b_cost = boundary_segmentation_cost(img_gradient,
-                                         reconstructed_contour_to_opencv_contour(
-                                             reconstruct_contour(locus=init_fourier_coeffs_first_part,
-                                                                 coeffs=init_fourier_coeffs_second_part,
-                                                                 num_points=p2c_acc)))
-
 boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, contours, region_segmentation2, scaling_const_beta)
+
+snake = snake.Snake(img_noise, region_segmentation2, contours)
+snake.set_w_line(scaling_const_beta)
+snake.set_w_edge(0.03)
+snake.set_alpha(0.01)
+snake.set_beta(0.1)
+
+snake_changed = snake.step()
+optimized_snake = snake.points
 
 start_time_boundary = time.time()
 
-optimized_fourier_coeffs = optimize.minimize(boundary_finding_interlaced, x0=init_fourier_coeffs_second_part,
-                                             args=(img_gradient, init_fourier_coeffs_first_part, p2c_acc,
-                                                   region_segmentation2, scaling_const_beta),
-                                             method='Nelder-Mead', options={'maxiter': max_iterations, 'disp': False},
-                                             callback=icm_interlaced_wrapped).x
+for iteration in range(max_iterations):
+    region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, region_segmentation2,
+                                                                 snake_to_opencv_contour(optimized_snake), clique_size,
+                                                                 sm_const,
+                                                                 scaling_const_alpha)
+    snake_changed = snake.step()
+    optimized_snake = snake.points
+    snake.update_binary(region_segmentation2)
 
 final_time_boundary = time.time() - start_time_boundary
 
-optimized_contour = reconstructed_contour_to_opencv_contour(
-    reconstruct_contour(locus=init_fourier_coeffs_first_part, coeffs=np.reshape(optimized_fourier_coeffs, (-1, 4)),
-                        num_points=p2c_acc))
+optimized_contour = snake_to_opencv_contour(optimized_snake)
 img_contour_optimized = copy.copy(img)
 cv2.drawContours(img_contour_optimized, optimized_contour, -1, 0, 1)
 optimized_boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, optimized_contour, region_segmentation2,

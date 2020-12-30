@@ -146,8 +146,11 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     contour_matrix = np.zeros(dims, dtype=np.int32)
     contour_matrix = np.pad(cv2.drawContours(contour_matrix, contour, -1, 1, -1), neighborhood_size, 'edge')
 
-    expected_val_in = np.bincount(new_w[contour_matrix == 1]).argmax()
-    expected_val_out = np.logical_not(expected_val_in)
+    # expected_val_in = np.bincount(new_w[contour_matrix == 1]).argmax()
+    # expected_val_out = np.logical_not(expected_val_in)
+
+    expected_val_in = 1
+    expected_val_out = 0
 
     for x in range(neighborhood_size, dims[0] + neighborhood_size):
         for y in range(neighborhood_size, dims[1] + neighborhood_size):
@@ -168,19 +171,19 @@ def iterated_conditional_modes_interlaced(image, w1, contour, neighborhood_size,
     return w
 
 
-img = cv2.imread('test_complex3.png', 0)
+img = cv2.imread('test_complex2.png', 0)
 
-gaussian_noise = np.random.normal(0, 50, size=(img.shape[0], img.shape[1]))
+gaussian_noise = np.random.normal(0, 80, size=(img.shape[0], img.shape[1]))
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=1)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=5)
 img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
-et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
+et, img_cn = cv2.threshold(cv2.imread('contour_complex.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
 img_contour = copy.copy(img)
@@ -189,8 +192,8 @@ cv2.drawContours(img_contour, contours, -1, 0, 1)
 init_tr = 180
 clique_size = 1
 sm_const = 30
-scaling_const_alpha = 200
-scaling_const_beta = 2.5
+scaling_const_alpha = 800
+scaling_const_beta = 7.25
 max_iterations = 10
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 
@@ -206,9 +209,9 @@ boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, contours, re
 
 snake = snake.Snake(img_noise, region_segmentation2, contours)
 snake.set_w_line(scaling_const_beta)
-snake.set_w_edge(0.03)
-snake.set_alpha(0.01)
-snake.set_beta(0.1)
+snake.set_w_edge(0.00025)
+snake.set_alpha(0.5)
+snake.set_beta(1.25)
 
 snake_changed = snake.step()
 optimized_snake = snake.points

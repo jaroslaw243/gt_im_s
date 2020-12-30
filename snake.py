@@ -7,9 +7,9 @@ class Snake:
     """ A Snake class for active contour segmentation """
 
     # Constants
-    MIN_DISTANCE_BETWEEN_POINTS = 4  # The minimum distance between two points to consider them overlaped
-    MAX_DISTANCE_BETWEEN_POINTS = 20  # The maximum distance to insert another point into the spline
-    SEARCH_KERNEL_SIZE = 7  # The size of the search kernel.
+    MIN_DISTANCE_BETWEEN_POINTS = 5  # The minimum distance between two points to consider them overlaped
+    MAX_DISTANCE_BETWEEN_POINTS = 50  # The maximum distance to insert another point into the spline
+    SEARCH_KERNEL_SIZE = 65  # The size of the search kernel.
 
     # Members
     image = None  # The source image.
@@ -50,8 +50,8 @@ class Snake:
 
         # Image variations used by the snake
         self.binary = init_binary
-        self.gradientX = cv2.Sobel(self.image, cv2.CV_64F, 1, 0, ksize=1)
-        self.gradientY = cv2.Sobel(self.image, cv2.CV_64F, 0, 1, ksize=1)
+        self.gradientX = cv2.Sobel(self.image, cv2.CV_64F, 1, 0, ksize=5)
+        self.gradientY = cv2.Sobel(self.image, cv2.CV_64F, 0, 1, ksize=5)
 
         # Set the snake behaviour (closed or open)
         self.closed = closed

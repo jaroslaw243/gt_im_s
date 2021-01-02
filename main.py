@@ -171,7 +171,9 @@ def boundary_finding_interlaced(coefficients, *args):
 
 img = cv2.imread('test_complex2.png', 0)
 
-gaussian_noise = np.random.normal(0, 50, size=img.shape)
+noise_mean = 0
+noise_var = 50
+gaussian_noise = np.random.normal(noise_mean, noise_var, size=img.shape)
 
 img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
 img_noise_temp[img_noise_temp > 255] = 255
@@ -186,7 +188,7 @@ contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPR
 
 
 init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(contours[0])), dtype=np.float)
-init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=100,
+init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(contours[0]), order=12,
                                                                normalize=False)
 
 img_contour = copy.copy(img)
@@ -197,9 +199,9 @@ cv2.drawContours(img_contour,
 
 init_tr = 180
 clique_size = 1
-sm_const = 13
-scaling_const_alpha = 75
-scaling_const_beta = 0.5
+sm_const = 8
+scaling_const_alpha = 300
+scaling_const_beta = 1.0
 max_iterations = 10
 p2c_acc = 4000
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
@@ -241,7 +243,7 @@ plt.setp(ax, xticks=[], yticks=[])
 ax[0].imshow(img, cmap='gray')
 ax[0].set_title('Original')
 ax[1].imshow(img_noise, cmap='gray')
-ax[1].set_title('Noisy')
+ax[1].set_title(r'Noisy ($\mu = %d, \sigma = %d$)' % (noise_mean, noise_var))
 ax[2].imshow(init_img_seg, cmap='gray')
 ax[2].set_title(f'Initial segmentation (threshold {init_tr})')
 ax[3].imshow(region_segmentation2, cmap='gray')
@@ -250,7 +252,7 @@ ax[3].set_title(f'ICM interlaced ({max_iterations} iterations)')
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])
 ax2[0].imshow(img_noise, cmap='gray')
-ax2[0].set_title('Original')
+ax2[0].set_title('Image')
 ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
 ax2[2].imshow(img_contour, cmap='gray')

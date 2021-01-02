@@ -8,30 +8,6 @@ import copy
 import time
 
 
-def fourier_parametrization_to_indices(a0_c0, coefficients, accuracy):
-    k_max = int(coefficients.size / 4)
-
-    contour_array = []
-    for t in np.arange(0, 2 * np.pi, accuracy):
-        second_term = np.zeros((1, 2), dtype=np.float)
-        coef_indices = np.array((0, 1, 3, 4), dtype=np.uint16)
-
-        for k in range(1, k_max + 1):
-            a_n = coefficients[coef_indices[0]]
-            b_n = coefficients[coef_indices[1]]
-            c_n = coefficients[coef_indices[2]]
-            d_n = coefficients[coef_indices[3]]
-            second_term += np.matmul(
-                np.array([[a_n, b_n], [c_n, d_n]], dtype=np.float),
-                np.array([np.cos(k * t), np.sin(k * t)], dtype=np.float))
-            coef_indices += 4
-        indices = np.rint(a0_c0 + second_term)
-
-        contour_array.append(indices)
-
-    return [np.array(contour_array, dtype=np.int32)]
-
-
 def reconstructed_contour_to_opencv_contour(contour_array):
     opencv_contour_array = []
     for ind in range(contour_array.shape[0]):
@@ -202,7 +178,7 @@ img_noise_temp[img_noise_temp > 255] = 255
 img_noise_temp[img_noise_temp < 0] = 0
 img_noise = np.array(img_noise_temp, dtype=np.uint8)
 
-img_gradient = cv2.Laplacian(cv2.GaussianBlur(img_noise, (3, 3), 3), cv2.CV_64F, ksize=11)
+img_gradient = cv2.Laplacian(img_noise, cv2.CV_64F, ksize=11)
 img_gradient = np.array(np.absolute(img_gradient), dtype=np.uint32)
 
 et, img_cn = cv2.threshold(cv2.imread('contour_complex.png', 0), 125, 1, cv2.THRESH_BINARY)
@@ -221,20 +197,16 @@ cv2.drawContours(img_contour,
 
 init_tr = 180
 clique_size = 1
-sm_const = 12
+sm_const = 13
 scaling_const_alpha = 75
 scaling_const_beta = 0.5
 max_iterations = 10
 p2c_acc = 4000
 ret, init_img_seg = cv2.threshold(img_noise, init_tr, 1, cv2.THRESH_BINARY)
 
-start_time_region = time.time()
 
-region_segmentation = iterated_conditional_modes(img_noise, init_img_seg, clique_size, sm_const)
 region_segmentation2 = iterated_conditional_modes_interlaced(img_noise, init_img_seg, contours, clique_size, sm_const,
                                                              scaling_const_alpha)
-
-final_time_region = time.time() - start_time_region
 
 prior_b_cost = boundary_segmentation_cost(img_gradient,
                                           reconstructed_contour_to_opencv_contour(
@@ -264,7 +236,7 @@ optimized_boundary_cost = boundary_segmentation_cost_interlaced(img_gradient, op
 
 matplotlib.use('TkAgg')
 
-fig, ax = plt.subplots(1, 5)
+fig, ax = plt.subplots(1, 4)
 plt.setp(ax, xticks=[], yticks=[])
 ax[0].imshow(img, cmap='gray')
 ax[0].set_title('Original')
@@ -272,10 +244,8 @@ ax[1].imshow(img_noise, cmap='gray')
 ax[1].set_title('Noisy')
 ax[2].imshow(init_img_seg, cmap='gray')
 ax[2].set_title(f'Initial segmentation (threshold {init_tr})')
-ax[3].imshow(region_segmentation, cmap='gray')
-ax[3].set_title(f'ICM ({max_iterations} iterations)')
-ax[4].imshow(region_segmentation2, cmap='gray')
-ax[4].set_title(f'ICM interlaced ({max_iterations} iterations, time: {final_time_region:.2f}s)')
+ax[3].imshow(region_segmentation2, cmap='gray')
+ax[3].set_title(f'ICM interlaced ({max_iterations} iterations)')
 
 fig2, ax2 = plt.subplots(1, 4)
 plt.setp(ax2, xticks=[], yticks=[])
@@ -284,8 +254,9 @@ ax2[0].set_title('Original')
 ax2[1].imshow(img_gradient, cmap='gray')
 ax2[1].set_title('Gradient')
 ax2[2].imshow(img_contour, cmap='gray')
-ax2[2].set_title(f'Initial contour (cost {boundary_cost})')
+ax2[2].set_title(f'Initial contour')
 ax2[3].imshow(img_contour_optimized, cmap='gray')
-ax2[3].set_title(f'Optimized contour (cost {optimized_boundary_cost}, time: {final_time_boundary:.2f}s)')
+ax2[3].set_title(f'Optimized contour (cost {(optimized_boundary_cost/boundary_cost):.2f},'
+                 f' time: {final_time_boundary:.2f}s)')
 
 plt.show()

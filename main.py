@@ -217,7 +217,6 @@ optimized_contour = gt_segmentation.reconstructed_contour_to_opencv_contour(
                         num_points=gt_segmentation.p2c_acc))
 img_contour_optimized = copy.copy(img)
 cv2.drawContours(img_contour_optimized, optimized_contour, -1, 0, 1)
-optimized_boundary_cost = 1
 
 matplotlib.use('TkAgg')
 

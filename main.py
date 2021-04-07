@@ -112,8 +112,8 @@ class GameTheoreticFramework:
         # return statement is for scipy's optimize function
         return -self.b_cost_interlaced
 
-    def iterated_conditional_modes_interlaced(self, starting_region_segmentation_func):
-        starting_region_segmentation = copy.copy(starting_region_segmentation_func)
+    def iterated_conditional_modes_interlaced(self):
+        starting_region_segmentation = copy.copy(self.region_segmentation)
         dims = starting_region_segmentation.shape
 
         # image and label matrix are padded to avoid indexing errors
@@ -173,7 +173,7 @@ class GameTheoreticFramework:
                 self.scaling_const_alpha * (sum_in + sum_out))
 
     def icm_interlaced_wrapped(self, contour_coeffs):
-        self.iterated_conditional_modes_interlaced(self.region_segmentation)
+        self.iterated_conditional_modes_interlaced()
 
 
 img = cv2.imread('test_complex3.png', 0)

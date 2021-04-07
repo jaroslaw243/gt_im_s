@@ -9,18 +9,24 @@ from scipy import optimize
 
 
 class GameTheoreticFramework:
-    def __init__(self, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations, p2c_acc,
-                 image, init_contours):
+    def __init__(self, image, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations,
+                 p2c_acc, order_of_fourier_coeffs, init_contours, object_brighter_than_background=True):
+        self.image = image
+
+        # for region based module
         self.init_tr = init_tr
         self.clique_size = clique_size
         self.sm_const = sm_const
         self.scaling_const_alpha = scaling_const_alpha
         self.scaling_const_beta = scaling_const_beta
         self.max_iterations = max_iterations
-        self.p2c_acc = p2c_acc
         self.region_segmentation = None
+        self.object_brighter_than_background = object_brighter_than_background
         self.init_img_seg = None
-        self.image = image
+
+        # for boundary finding module
+        self.p2c_acc = p2c_acc
+        self.order_of_fourier_coeffs = order_of_fourier_coeffs
         self.image_gradient = None
         self.contours = init_contours
         self.prior_b_cost = 0
@@ -43,7 +49,11 @@ class GameTheoreticFramework:
     def init_region_segmentation(self):
         # binary thresholding is conducted to initialize region segmentation module,
         # initial labels are saved for comparison with final result
-        ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY)
+        if self.object_brighter_than_background:
+            ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY)
+        else:
+            ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY_INV)
+
         self.region_segmentation = copy.copy(self.init_img_seg)
 
     def init_boundary_finding(self):
@@ -51,7 +61,8 @@ class GameTheoreticFramework:
         self.init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(self.contours[0])),
                                                        dtype=np.float)
         # an, bn, cn and dn are calculated using the same package
-        self.init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(self.contours[0]), order=12,
+        self.init_fourier_coeffs_second_part = elliptic_fourier_descriptors(np.squeeze(self.contours[0]),
+                                                                            order=self.order_of_fourier_coeffs,
                                                                             normalize=False)
 
         # gradient of the image is obtained
@@ -179,9 +190,9 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-gt_segmentation = GameTheoreticFramework(init_tr=180, clique_size=1, sm_const=8, scaling_const_alpha=300,
-                                         scaling_const_beta=1.0, max_iterations=10, p2c_acc=4000, image=img_noise,
-                                         init_contours=contours)
+gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=1, sm_const=8,
+                                         scaling_const_alpha=300, scaling_const_beta=1.0, max_iterations=10,
+                                         p2c_acc=2000, order_of_fourier_coeffs=12, init_contours=contours)
 
 img_contour = copy.copy(img)
 cv2.drawContours(img_contour,
@@ -231,7 +242,7 @@ ax2[2].imshow(img_contour, cmap='gray')
 ax2[2].set_title(f'Initial contour')
 ax2[3].imshow(img_contour_optimized, cmap='gray')
 ax2[3].set_title(
-    f'Optimized contour (cost {(gt_segmentation.b_cost_interlaced / gt_segmentation.init_b_cost_interlaced ):.2f},'
+    f'Optimized contour (cost {(gt_segmentation.b_cost_interlaced / gt_segmentation.init_b_cost_interlaced):.2f},'
     f' time: {final_time_boundary:.2f}s)')
 
 plt.show()

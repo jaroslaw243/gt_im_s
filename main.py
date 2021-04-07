@@ -80,8 +80,8 @@ class GameTheoreticFramework:
         self.prior_b_cost = copy.copy(self.init_b_cost_interlaced)
 
     def boundary_segmentation_cost_interlaced(self):
-        # contour is drawn on matrix of zeros with value of 1 and thickness 1,
-        # we can use that matrix to obtain values that correspond to ones in gradient image
+        # contour is drawn on matrix of zeros, with value of 1 and thickness 1,
+        # we can use that matrix to obtain values that correspond to 1 in gradient image (so they lay on the contour)
         drawn_contour = np.zeros(self.image_gradient.shape, dtype=np.int32)
         cv2.drawContours(drawn_contour, self.contours, -1, 1, 1)
         b_cost = np.sum(self.image_gradient[drawn_contour == 1])

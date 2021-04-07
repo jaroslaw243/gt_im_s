@@ -20,16 +20,16 @@ class GameTheoreticFramework:
         self.scaling_const_alpha = scaling_const_alpha
         self.scaling_const_beta = scaling_const_beta
         self.max_iterations = max_iterations
-        self.region_segmentation = None
         self.object_brighter_than_background = object_brighter_than_background
+        self.region_segmentation = None
         self.init_img_seg = None
 
         # for boundary finding module
         self.p2c_acc = p2c_acc
         self.order_of_fourier_coeffs = order_of_fourier_coeffs
-        self.image_gradient = None
         self.contours = init_contours
         self.prior_b_cost = 0
+        self.image_gradient = None
         self.init_b_cost_interlaced = None
         self.b_cost_interlaced = None
         self.init_fourier_coeffs_first_part = None
@@ -103,32 +103,14 @@ class GameTheoreticFramework:
 
         return prior_b_cost_temp + b_cost + (self.scaling_const_beta * region_module_influence)
 
-    def region_segmentation_cost_clique_interlaced(self, padded_image, padded_segmentation, contour_m, u, v, i, j,
-                                                   change=False):
-        # clique is copied to new variable because we want to flip it's values to see if energy decreases,
-        # without altering original matrix
-        segmentation_clique = copy.copy(padded_segmentation[i - self.clique_size:i + (self.clique_size + 1),
-                                        j - self.clique_size:j + (self.clique_size + 1)])
-        image_clique = padded_image[i - self.clique_size:i + (self.clique_size + 1),
-                                    j - self.clique_size:j + (self.clique_size + 1)]
-        if change:
-            if segmentation_clique[self.clique_size, self.clique_size] == 1:
-                segmentation_clique[self.clique_size, self.clique_size] = 0
-            else:
-                segmentation_clique[self.clique_size, self.clique_size] = 1
+    def boundary_finding_interlaced(self, coefficients):
+        self.contours = self.reconstructed_contour_to_opencv_contour(
+            reconstruct_contour(locus=self.init_fourier_coeffs_first_part, coeffs=np.reshape(coefficients, (-1, 4)),
+                                num_points=self.p2c_acc))
+        self.b_cost_interlaced = self.boundary_segmentation_cost_interlaced()
 
-        data_fidelity_term = np.sum(np.square(image_clique - segmentation_clique))
-        smoothness_term = np.sum(
-            np.square(segmentation_clique - segmentation_clique[self.clique_size, self.clique_size]))
-
-        boundary_seg = contour_m[i - self.clique_size:i + (self.clique_size + 1),
-                                 j - self.clique_size:j + (self.clique_size + 1)]
-
-        sum_in = np.sum(np.square(segmentation_clique[boundary_seg == 1] - u))
-        sum_out = np.sum(np.square(segmentation_clique[boundary_seg == 0] - v))
-
-        return (data_fidelity_term + (self.sm_const ** 2) * smoothness_term) + (
-                self.scaling_const_alpha * (sum_in + sum_out))
+        # return statement is for scipy's optimize function
+        return -self.b_cost_interlaced
 
     def iterated_conditional_modes_interlaced(self, starting_region_segmentation_func):
         starting_region_segmentation = copy.copy(starting_region_segmentation_func)
@@ -163,17 +145,35 @@ class GameTheoreticFramework:
 
         self.region_segmentation = starting_region_segmentation
 
+    def region_segmentation_cost_clique_interlaced(self, padded_image, padded_segmentation, contour_m, u, v, i, j,
+                                                   change=False):
+        # clique is copied to new variable because we want to flip it's values to see if energy decreases,
+        # without altering original matrix
+        segmentation_clique = copy.copy(padded_segmentation[i - self.clique_size:i + (self.clique_size + 1),
+                                        j - self.clique_size:j + (self.clique_size + 1)])
+        image_clique = padded_image[i - self.clique_size:i + (self.clique_size + 1),
+                                    j - self.clique_size:j + (self.clique_size + 1)]
+        if change:
+            if segmentation_clique[self.clique_size, self.clique_size] == 1:
+                segmentation_clique[self.clique_size, self.clique_size] = 0
+            else:
+                segmentation_clique[self.clique_size, self.clique_size] = 1
+
+        data_fidelity_term = np.sum(np.square(image_clique - segmentation_clique))
+        smoothness_term = np.sum(
+            np.square(segmentation_clique - segmentation_clique[self.clique_size, self.clique_size]))
+
+        boundary_seg = contour_m[i - self.clique_size:i + (self.clique_size + 1),
+                                 j - self.clique_size:j + (self.clique_size + 1)]
+
+        sum_in = np.sum(np.square(segmentation_clique[boundary_seg == 1] - u))
+        sum_out = np.sum(np.square(segmentation_clique[boundary_seg == 0] - v))
+
+        return (data_fidelity_term + (self.sm_const ** 2) * smoothness_term) + (
+                self.scaling_const_alpha * (sum_in + sum_out))
+
     def icm_interlaced_wrapped(self, contour_coeffs):
         self.iterated_conditional_modes_interlaced(self.region_segmentation)
-
-    def boundary_finding_interlaced(self, coefficients):
-        self.contours = self.reconstructed_contour_to_opencv_contour(
-            reconstruct_contour(locus=self.init_fourier_coeffs_first_part, coeffs=np.reshape(coefficients, (-1, 4)),
-                                num_points=self.p2c_acc))
-        self.b_cost_interlaced = self.boundary_segmentation_cost_interlaced()
-
-        # return statement is for scipy's optimize function
-        return -self.b_cost_interlaced
 
 
 img = cv2.imread('test_complex3.png', 0)

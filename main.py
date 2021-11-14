@@ -12,6 +12,7 @@ class GameTheoreticFramework:
     def __init__(self, image, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations,
                  p2c_acc, order_of_fourier_coeffs, init_contours, object_brighter_than_background=True):
         self.image = image
+        self.iter_num = 0
 
         # for region based module
         self.init_tr = init_tr
@@ -67,7 +68,8 @@ class GameTheoreticFramework:
 
         # gradient of the image is obtained
         img_gradient_neg = cv2.Laplacian(self.image, cv2.CV_64F, ksize=11)
-        self.image_gradient = np.array(np.absolute(img_gradient_neg), dtype=np.uint32)
+        self.image_gradient = np.absolute(img_gradient_neg)
+        self.image_gradient = (self.image_gradient / np.amax(self.image_gradient)) * 255
 
         # contour is remade using calculated fourier coefficients
         self.contours = self.reconstructed_contour_to_opencv_contour(
@@ -172,8 +174,12 @@ class GameTheoreticFramework:
         return (data_fidelity_term + (self.sm_const ** 2) * smoothness_term) + (
                 self.scaling_const_alpha * (sum_in + sum_out))
 
-    def icm_interlaced_wrapped(self, contour_coeffs):
+    def icm_interlaced_wrapped(self, contour_coeffs, convergence):
         self.iterated_conditional_modes_interlaced()
+
+        self.iter_num += 1
+        print('Iteration nr ', self.iter_num)
+        return False
 
 
 img = cv2.imread('test_complex3.png', 0)
@@ -191,8 +197,8 @@ et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.TH
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
 gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=1, sm_const=8,
-                                         scaling_const_alpha=300, scaling_const_beta=1.0, max_iterations=10,
-                                         p2c_acc=2000, order_of_fourier_coeffs=12, init_contours=contours)
+                                         scaling_const_alpha=300, scaling_const_beta=0.1, max_iterations=10,
+                                         p2c_acc=200, order_of_fourier_coeffs=24, init_contours=contours)
 
 img_contour = copy.copy(img)
 cv2.drawContours(img_contour,
@@ -203,11 +209,14 @@ cv2.drawContours(img_contour,
 
 start_time_boundary = time.time()
 
-optimized_fourier_coeffs = optimize.minimize(gt_segmentation.boundary_finding_interlaced,
-                                             x0=gt_segmentation.init_fourier_coeffs_second_part,
-                                             method='Nelder-Mead',
-                                             options={'maxiter': gt_segmentation.max_iterations, 'disp': False},
-                                             callback=gt_segmentation.icm_interlaced_wrapped).x
+bounds_width = 0.25
+bounds_middle = gt_segmentation.init_fourier_coeffs_second_part.flatten()
+lb = bounds_middle - np.abs(bounds_middle * bounds_width)
+ub = bounds_middle + np.abs(bounds_middle * bounds_width)
+bounds_gt = optimize.Bounds(lb, ub)
+optimized_fourier_coeffs = optimize.differential_evolution(func=gt_segmentation.boundary_finding_interlaced,
+                                                           bounds=bounds_gt, maxiter=gt_segmentation.max_iterations,
+                                                           x0=gt_segmentation.init_fourier_coeffs_second_part.flatten()).x
 
 final_time_boundary = time.time() - start_time_boundary
 

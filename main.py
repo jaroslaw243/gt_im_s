@@ -12,20 +12,20 @@ class GameTheoreticFramework:
     def __init__(self, image, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations,
                  p2c_acc, order_of_fourier_coeffs, init_contours, object_brighter_than_background=True):
         self.image = image
+        self.max_iterations = max_iterations
         self.iter_num = 0
 
         # for region based module
+        self.scaling_const_alpha = scaling_const_alpha
         self.init_tr = init_tr
         self.clique_size = clique_size
         self.sm_const = sm_const
-        self.scaling_const_alpha = scaling_const_alpha
-        self.scaling_const_beta = scaling_const_beta
-        self.max_iterations = max_iterations
         self.object_brighter_than_background = object_brighter_than_background
         self.region_segmentation = None
         self.init_img_seg = None
 
         # for boundary finding module
+        self.scaling_const_beta = scaling_const_beta
         self.p2c_acc = p2c_acc
         self.order_of_fourier_coeffs = order_of_fourier_coeffs
         self.contours = init_contours
@@ -69,7 +69,7 @@ class GameTheoreticFramework:
         # gradient of the image is obtained
         img_gradient_neg = cv2.Laplacian(self.image, cv2.CV_64F, ksize=11)
         self.image_gradient = np.absolute(img_gradient_neg)
-        self.image_gradient = (self.image_gradient / np.amax(self.image_gradient)) * 255
+        self.image_gradient = np.array((self.image_gradient / np.amax(self.image_gradient)) * 255, dtype=np.uint8)
 
         # contour is remade using calculated fourier coefficients
         self.contours = self.reconstructed_contour_to_opencv_contour(
@@ -196,9 +196,9 @@ img_noise = np.array(img_noise_temp, dtype=np.uint8)
 et, img_cn = cv2.threshold(cv2.imread('contour_complex2.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
-gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=1, sm_const=8,
-                                         scaling_const_alpha=300, scaling_const_beta=0.1, max_iterations=10,
-                                         p2c_acc=200, order_of_fourier_coeffs=24, init_contours=contours)
+gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=1, sm_const=0.75,
+                                         scaling_const_alpha=400, scaling_const_beta=1, max_iterations=10,
+                                         p2c_acc=250, order_of_fourier_coeffs=24, init_contours=contours)
 
 img_contour = copy.copy(img)
 cv2.drawContours(img_contour,
@@ -207,18 +207,20 @@ cv2.drawContours(img_contour,
                                          coeffs=gt_segmentation.init_fourier_coeffs_second_part,
                                          num_points=gt_segmentation.p2c_acc)), -1, 0, 1)
 
-start_time_boundary = time.time()
-
 bounds_width = 0.25
 bounds_middle = gt_segmentation.init_fourier_coeffs_second_part.flatten()
 lb = bounds_middle - np.abs(bounds_middle * bounds_width)
 ub = bounds_middle + np.abs(bounds_middle * bounds_width)
 bounds_gt = optimize.Bounds(lb, ub)
+
+start_time = time.time()
+
 optimized_fourier_coeffs = optimize.differential_evolution(func=gt_segmentation.boundary_finding_interlaced,
                                                            bounds=bounds_gt, maxiter=gt_segmentation.max_iterations,
+                                                           callback=gt_segmentation.icm_interlaced_wrapped,
                                                            x0=gt_segmentation.init_fourier_coeffs_second_part.flatten()).x
 
-final_time_boundary = time.time() - start_time_boundary
+finish_time = time.time() - start_time
 
 optimized_contour = gt_segmentation.reconstructed_contour_to_opencv_contour(
     reconstruct_contour(locus=gt_segmentation.init_fourier_coeffs_first_part,
@@ -251,6 +253,6 @@ ax2[2].set_title(f'Initial contour')
 ax2[3].imshow(img_contour_optimized, cmap='gray')
 ax2[3].set_title(
     f'Optimized contour (cost {(gt_segmentation.b_cost_interlaced / gt_segmentation.init_b_cost_interlaced):.2f},'
-    f' time: {final_time_boundary:.2f}s)')
+    f' time: {finish_time:.2f}s)')
 
 plt.show()

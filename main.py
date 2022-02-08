@@ -10,7 +10,8 @@ from scipy import optimize
 
 class GameTheoreticFramework:
     def __init__(self, image, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations,
-                 p2c_acc, order_of_fourier_coeffs, init_contours, object_brighter_than_background=True):
+                 p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize,
+                 region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True):
         self.image = image
         self.max_iterations = max_iterations
         self.iter_num = 0
@@ -20,6 +21,8 @@ class GameTheoreticFramework:
         self.init_tr = init_tr
         self.clique_size = clique_size
         self.sm_const = sm_const
+        self.expected_val_in = region_seg_expected_vals_in_and_out[0]
+        self.expected_val_out = region_seg_expected_vals_in_and_out[1]
         self.object_brighter_than_background = object_brighter_than_background
         self.region_segmentation = None
         self.init_img_seg = None
@@ -29,6 +32,7 @@ class GameTheoreticFramework:
         self.p2c_acc = p2c_acc
         self.order_of_fourier_coeffs = order_of_fourier_coeffs
         self.contours = init_contours
+        self.img_gradient_ksize = img_gradient_ksize
         self.prior_b_cost = 0
         self.image_gradient = None
         self.init_b_cost_interlaced = None
@@ -67,7 +71,7 @@ class GameTheoreticFramework:
                                                                             normalize=False)
 
         # gradient of the image is obtained
-        img_gradient_neg = cv2.Laplacian(self.image, cv2.CV_64F, ksize=11)
+        img_gradient_neg = cv2.Laplacian(self.image, cv2.CV_64F, ksize=self.img_gradient_ksize)
         self.image_gradient = np.absolute(img_gradient_neg)
         self.image_gradient = np.array((self.image_gradient / np.amax(self.image_gradient)) * 255, dtype=np.uint8)
 
@@ -95,11 +99,11 @@ class GameTheoreticFramework:
         contour_matrix = np.zeros(self.region_segmentation.shape, dtype=np.int32)
         cv2.drawContours(contour_matrix, self.contours, -1, 1, -1)
 
-        # it is assumed that background pixels are labeled with zeros,
-        # they are replaced with a negative number so they decrease overall energy in boundary finding module
+        # background pixels labels are replaced with a negative number,
+        # so they decrease overall energy in boundary finding module
         image_r = copy.copy(self.region_segmentation)
         image_r = np.array(image_r, dtype=np.int8)
-        image_r[image_r == 0] = -1
+        image_r[image_r == self.expected_val_out] = -1
 
         region_module_influence = np.sum(image_r[contour_matrix == 1])
 
@@ -121,23 +125,15 @@ class GameTheoreticFramework:
         # image and label matrix are padded to avoid indexing errors
         new_w = np.array(np.pad(starting_region_segmentation, self.clique_size, 'edge'), dtype=np.int32)
         image_p = np.array(np.pad(self.image, self.clique_size, 'edge'), dtype=np.int32)
+        # contour is drawn on matrix of zeros with value of 1 and thickness -1 (so filled)
         contour_matrix = np.zeros(dims, dtype=np.int32)
         contour_matrix = np.pad(cv2.drawContours(contour_matrix, self.contours, -1, 1, -1), self.clique_size, 'edge')
 
-        # it is assumed that object pixels are labeled as ones,
-        # background as zeros (and that there are only those two possibilities)
-        expected_val_in = 1
-        expected_val_out = 0
-
         for x in range(self.clique_size, dims[0] + self.clique_size):
             for y in range(self.clique_size, dims[1] + self.clique_size):
-                current_energy = self.region_segmentation_cost_clique_interlaced(image_p, new_w, contour_matrix,
-                                                                                 expected_val_in,
-                                                                                 expected_val_out, x, y)
+                current_energy = self.region_segmentation_cost_clique_interlaced(image_p, new_w, contour_matrix, x, y)
 
-                new_energy = self.region_segmentation_cost_clique_interlaced(image_p, new_w, contour_matrix,
-                                                                             expected_val_in,
-                                                                             expected_val_out, x, y, True)
+                new_energy = self.region_segmentation_cost_clique_interlaced(image_p, new_w, contour_matrix, x, y, True)
 
                 if new_energy < current_energy:
                     if starting_region_segmentation[x - self.clique_size, y - self.clique_size] == 1:
@@ -147,9 +143,9 @@ class GameTheoreticFramework:
 
         self.region_segmentation = starting_region_segmentation
 
-    def region_segmentation_cost_clique_interlaced(self, padded_image, padded_segmentation, contour_m, u, v, i, j,
+    def region_segmentation_cost_clique_interlaced(self, padded_image, padded_segmentation, contour_m, i, j,
                                                    change=False):
-        # clique is copied to new variable because we want to flip it's values to see if energy decreases,
+        # clique is copied to new variable because we want to flip its values to see if energy decreases,
         # without altering original matrix
         segmentation_clique = copy.copy(padded_segmentation[i - self.clique_size:i + (self.clique_size + 1),
                                         j - self.clique_size:j + (self.clique_size + 1)])
@@ -168,8 +164,8 @@ class GameTheoreticFramework:
         boundary_seg = contour_m[i - self.clique_size:i + (self.clique_size + 1),
                                  j - self.clique_size:j + (self.clique_size + 1)]
 
-        sum_in = np.sum(np.square(segmentation_clique[boundary_seg == 1] - u))
-        sum_out = np.sum(np.square(segmentation_clique[boundary_seg == 0] - v))
+        sum_in = np.sum(np.square(segmentation_clique[boundary_seg == 1] - self.expected_val_in))
+        sum_out = np.sum(np.square(segmentation_clique[boundary_seg == 0] - self.expected_val_out))
 
         return (data_fidelity_term + (self.sm_const ** 2) * smoothness_term) + (
                 self.scaling_const_alpha * (sum_in + sum_out))
@@ -198,7 +194,8 @@ contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPR
 
 gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=1, sm_const=0.75,
                                          scaling_const_alpha=400, scaling_const_beta=1, max_iterations=10,
-                                         p2c_acc=250, order_of_fourier_coeffs=24, init_contours=contours)
+                                         p2c_acc=250, order_of_fourier_coeffs=24, init_contours=contours,
+                                         img_gradient_ksize=11)
 
 img_contour = copy.copy(img)
 cv2.drawContours(img_contour,
@@ -207,7 +204,7 @@ cv2.drawContours(img_contour,
                                          coeffs=gt_segmentation.init_fourier_coeffs_second_part,
                                          num_points=gt_segmentation.p2c_acc)), -1, 0, 1)
 
-bounds_width = 0.25
+bounds_width = 0.15
 bounds_middle = gt_segmentation.init_fourier_coeffs_second_part.flatten()
 lb = bounds_middle - np.abs(bounds_middle * bounds_width)
 ub = bounds_middle + np.abs(bounds_middle * bounds_width)

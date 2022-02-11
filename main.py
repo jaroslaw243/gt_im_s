@@ -25,7 +25,7 @@ contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPR
 
 gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=4, sm_const=14,
                                          scaling_const_alpha=0.1, scaling_const_beta=0.1, max_iterations=10,
-                                         p2c_acc=2000, order_of_fourier_coeffs=18, init_contours=contours,
+                                         p2c_acc=2000, order_of_fourier_coeffs=14, init_contours=contours,
                                          img_gradient_ksize=29)
 
 img_contour = copy.copy(img)

@@ -76,7 +76,7 @@ fig.suptitle(
 
 plt.setp(ax, xticks=[], yticks=[])
 ax[0, 0].imshow(img, cmap='gray')
-ax[0, 0].set_title('Original')
+ax[0, 0].set_title(f'Original (height: {img.shape[0]}px, width: {img.shape[1]}px)')
 ax[0, 1].imshow(img_noise, cmap='gray')
 ax[0, 1].set_title(r'Noisy ($\mu = %d, \sigma = %d$)' % (noise_mean, noise_var))
 ax[0, 2].imshow(gt_segmentation.init_img_seg, cmap='gray')

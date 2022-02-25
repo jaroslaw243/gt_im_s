@@ -95,11 +95,12 @@ class GameTheoreticFramework:
         contour_matrix = np.zeros(self.region_segmentation.shape, dtype=np.int32)
         cv2.drawContours(contour_matrix, self.contours, -1, 1, -1)
 
-        # background pixels labels are replaced with a negative number,
-        # so they decrease overall energy in boundary finding module
         image_r = copy.copy(self.region_segmentation)
         image_r = np.array(image_r, dtype=np.int8)
-        image_r[image_r == self.expected_val_out] = -1
+
+        # background pixel labels are replaced with a negative number,
+        # so they decrease overall energy in boundary finding module
+        image_r[image_r == 0] = -1
 
         region_module_influence = np.sum(image_r[contour_matrix == 1])
 

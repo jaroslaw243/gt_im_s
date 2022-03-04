@@ -7,18 +7,14 @@ import time
 from pyefd import reconstruct_contour
 from scipy import optimize
 from game_theoretic_framework import GameTheoreticFramework
-from utils import dice
+from utils import dice, add_gaussian_noise
 
 img = cv2.imread('test_complex2.png', 0)
 
 noise_mean = 0
-noise_var = 100
-gaussian_noise = np.random.normal(noise_mean, noise_var, size=img.shape)
+noise_sd = 100
 
-img_noise_temp = np.array(img, dtype=np.int32) + gaussian_noise
-img_noise_temp[img_noise_temp > 255] = 255
-img_noise_temp[img_noise_temp < 0] = 0
-img_noise = np.array(img_noise_temp, dtype=np.uint8)
+img_noise = add_gaussian_noise(image=img, s_deviation=noise_sd, mean=noise_mean)
 
 et, img_cn = cv2.threshold(cv2.imread('contour_complex3.png', 0), 125, 1, cv2.THRESH_BINARY)
 contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
@@ -78,7 +74,7 @@ plt.setp(ax, xticks=[], yticks=[])
 ax[0, 0].imshow(img, cmap='gray')
 ax[0, 0].set_title(f'Original (height: {img.shape[0]}px, width: {img.shape[1]}px)')
 ax[0, 1].imshow(img_noise, cmap='gray')
-ax[0, 1].set_title(r'Noisy ($\mu = %d, \sigma = %d$)' % (noise_mean, noise_var))
+ax[0, 1].set_title(r'Noisy ($\mu = %d, \sigma = %d$)' % (noise_mean, noise_sd))
 ax[0, 2].imshow(gt_segmentation.init_img_seg, cmap='gray')
 ax[0, 2].set_title(f'Initial segmentation (threshold {gt_segmentation.init_tr})')
 ax[0, 3].imshow(gt_segmentation.region_segmentation, cmap='gray')

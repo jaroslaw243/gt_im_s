@@ -6,25 +6,24 @@ import copy
 import time
 from pyefd import reconstruct_contour
 from scipy import optimize
+import yaml
 from game_theoretic_framework import GameTheoreticFramework
-from utils import dice, add_gaussian_noise
+from utils import dice
 
-img = cv2.imread('test_complex2.png', 0)
+ref_img = cv2.imread('test_complex2.png', 0)
 
-noise_mean = 0
-noise_sd = 100
+with open(r'.\gt_segmentation.yaml') as file:
+    gt_segmentation = yaml.load(file, Loader=yaml.Loader)
 
-img_noise = add_gaussian_noise(image=img, s_deviation=noise_sd, mean=noise_mean)
+gt_segmentation.run_full_init()
 
-et, img_cn = cv2.threshold(cv2.imread('contour_complex3.png', 0), 125, 1, cv2.THRESH_BINARY)
-contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+filename = gt_segmentation.image_path.split(".")
+filename = filename[0]
+filename = filename.split("_")
+noise_mean = int(filename[-2])
+noise_sd = int(filename[-1])
 
-gt_segmentation = GameTheoreticFramework(image=img_noise, init_tr=180, clique_size=4, sm_const=14,
-                                         scaling_const_alpha=0.1, scaling_const_beta=0.1, max_iterations=10,
-                                         p2c_acc=2000, order_of_fourier_coeffs=14, init_contours=contours,
-                                         img_gradient_ksize=29)
-
-img_contour = copy.copy(img)
+img_contour = copy.copy(ref_img)
 cv2.drawContours(img_contour,
                  gt_segmentation.reconstructed_contour_to_opencv_contour(
                      reconstruct_contour(locus=gt_segmentation.init_fourier_coeffs_first_part,
@@ -50,13 +49,13 @@ optimized_contour = gt_segmentation.reconstructed_contour_to_opencv_contour(
     reconstruct_contour(locus=gt_segmentation.init_fourier_coeffs_first_part,
                         coeffs=np.reshape(optimized_fourier_coeffs, (-1, 4)),
                         num_points=gt_segmentation.p2c_acc))
-img_contour_optimized = copy.copy(img)
+img_contour_optimized = copy.copy(ref_img)
 cv2.drawContours(img_contour_optimized, optimized_contour, -1, 0, 1)
 
 if gt_segmentation.object_brighter_than_background:
-    ret, reference_seg = cv2.threshold(img, gt_segmentation.init_tr, 1, cv2.THRESH_BINARY)
+    ret, reference_seg = cv2.threshold(ref_img, gt_segmentation.init_tr, 1, cv2.THRESH_BINARY)
 else:
-    ret, reference_seg = cv2.threshold(img, gt_segmentation.init_tr, 1, cv2.THRESH_BINARY_INV)
+    ret, reference_seg = cv2.threshold(ref_img, gt_segmentation.init_tr, 1, cv2.THRESH_BINARY_INV)
 
 optimized_contour_matrix = np.zeros(reference_seg.shape, dtype=reference_seg.dtype)
 cv2.drawContours(optimized_contour_matrix, optimized_contour, -1, 1, -1)
@@ -71,9 +70,9 @@ fig.suptitle(
         gt_segmentation.max_iterations, finish_time), fontsize=32)
 
 plt.setp(ax, xticks=[], yticks=[])
-ax[0, 0].imshow(img, cmap='gray')
-ax[0, 0].set_title(f'Original (height: {img.shape[0]}px, width: {img.shape[1]}px)')
-ax[0, 1].imshow(img_noise, cmap='gray')
+ax[0, 0].imshow(ref_img, cmap='gray')
+ax[0, 0].set_title(f'Original (height: {ref_img.shape[0]}px, width: {ref_img.shape[1]}px)')
+ax[0, 1].imshow(gt_segmentation.image, cmap='gray')
 ax[0, 1].set_title(r'Noisy ($\mu = %d, \sigma = %d$)' % (noise_mean, noise_sd))
 ax[0, 2].imshow(gt_segmentation.init_img_seg, cmap='gray')
 ax[0, 2].set_title(f'Initial segmentation (threshold {gt_segmentation.init_tr})')

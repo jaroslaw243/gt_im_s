@@ -5,11 +5,12 @@ from pyefd import elliptic_fourier_descriptors, calculate_dc_coefficients, recon
 
 
 class GameTheoreticFramework:
-    def __init__(self, image, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta, max_iterations,
-                 p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize,
-                 region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True):
-        self.image = image
+    def __init__(self, image_path, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta,
+                 max_iterations, p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize,
+                 region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True, full_init=True):
         self.max_iterations = max_iterations
+        self.image_path = image_path
+        self.image = None
         self.iter_num = 0
 
         # for region based module
@@ -27,8 +28,9 @@ class GameTheoreticFramework:
         self.scaling_const_beta = scaling_const_beta
         self.p2c_acc = p2c_acc
         self.order_of_fourier_coeffs = order_of_fourier_coeffs
-        self.contours = init_contours
         self.img_gradient_ksize = img_gradient_ksize
+        self.init_contours = init_contours
+        self.contours = None
         self.prior_b_cost = 0
         self.image_gradient = None
         self.init_b_cost_interlaced = None
@@ -36,8 +38,8 @@ class GameTheoreticFramework:
         self.init_fourier_coeffs_first_part = None
         self.init_fourier_coeffs_second_part = None
 
-        self.init_region_segmentation()
-        self.init_boundary_finding()
+        if full_init:
+            self.run_full_init()
 
     @staticmethod
     def reconstructed_contour_to_opencv_contour(contour_array):
@@ -46,6 +48,12 @@ class GameTheoreticFramework:
             opencv_contour_array.append([np.rint([contour_array[ind, 0], contour_array[ind, 1]])])
 
         return [np.array(opencv_contour_array, dtype=np.int32)]
+
+    def run_full_init(self):
+        self.image = cv2.imread(self.image_path, 0)
+
+        self.init_region_segmentation()
+        self.init_boundary_finding()
 
     def init_region_segmentation(self):
         # binary thresholding is conducted to initialize region segmentation module,
@@ -58,6 +66,19 @@ class GameTheoreticFramework:
         self.region_segmentation = copy.copy(self.init_img_seg)
 
     def init_boundary_finding(self):
+        if isinstance(self.init_contours, str):
+            et, img_cn = cv2.threshold(cv2.imread(self.init_contours, 0), 125, 1, cv2.THRESH_BINARY)
+            self.contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+        elif isinstance(self.init_contours, list):
+            self.contours = self.init_contours
+
+        else:
+            raise TypeError("'init_contours' can only be one of these two:\n"
+                            "- path to a image that after binarization, with threshold equal to 125, will be suitable"
+                            " for openCV function 'findContours';\n"
+                            "- python list containing openCV contour.\n")
+
         # a0 and c0 are calculated using pyefd package
         self.init_fourier_coeffs_first_part = np.array(calculate_dc_coefficients(np.squeeze(self.contours[0])),
                                                        dtype=np.float)

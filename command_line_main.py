@@ -53,8 +53,7 @@ start_time = time.time()
 
 optimized_fourier_coeffs = optimize.differential_evolution(func=gt_segmentation.boundary_finding_interlaced,
                                                            bounds=bounds_gt, maxiter=gt_segmentation.max_iterations,
-                                                           callback=gt_segmentation.icm_interlaced_wrapped,
-                                                           x0=gt_segmentation.init_fourier_coeffs_second_part.flatten()).x
+                                                           callback=gt_segmentation.icm_interlaced_wrapped).x
 
 finish_time = time.time() - start_time
 

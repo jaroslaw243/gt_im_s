@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-import matplotlib
 import copy
 import time
 from pyefd import reconstruct_contour
@@ -76,7 +75,6 @@ region_dice = dice(gt_segmentation.region_segmentation, reference_seg)
 contour_dice = dice(optimized_contour_matrix, reference_seg)
 
 dpi_for_fig = 150
-matplotlib.use('TkAgg')
 
 fig, ax = plt.subplots(2, 4, figsize=(round(1920/dpi_for_fig), round(1080/dpi_for_fig)), dpi=dpi_for_fig)
 
@@ -111,6 +109,5 @@ plt.savefig(args.figures_name, bbox_inches='tight', dpi=dpi_for_fig)
 output_dict = {'input_name': args.input, 'elapsed_time': finish_time,
                'region_dice': float(region_dice), 'contour_dice': float(contour_dice)}
 
-with open(args.yaml_name, 'r+') as file:
-    list_of_output_dicts = yaml.safe_load(file)
+with open(args.yaml_name, 'a') as file:
     yaml.safe_dump([{args.dict_key: output_dict}], file)

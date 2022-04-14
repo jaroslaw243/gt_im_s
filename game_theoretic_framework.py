@@ -5,8 +5,8 @@ from pyefd import elliptic_fourier_descriptors, calculate_dc_coefficients, recon
 
 
 class GameTheoreticFramework:
-    def __init__(self, image_path, init_tr, clique_size, sm_const, scaling_const_alpha, scaling_const_beta,
-                 max_iterations, p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize,
+    def __init__(self, image_path, clique_size, sm_const, scaling_const_alpha, scaling_const_beta,
+                 max_iterations, p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize, init_tr=None,
                  region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True, full_init=True):
         self.max_iterations = max_iterations
         self.image_path = image_path
@@ -60,10 +60,19 @@ class GameTheoreticFramework:
     def init_region_segmentation(self):
         # binary thresholding is conducted to initialize region segmentation module,
         # initial labels are saved for comparison with final result
-        if self.object_brighter_than_background:
-            ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY)
+        if self.init_tr is None:
+            if self.object_brighter_than_background:
+                ret, self.init_img_seg = cv2.threshold(self.image, 0, 1, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+            else:
+                ret, self.init_img_seg = cv2.threshold(self.image, 0, 1, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+
+            self.init_tr = round(ret)
+
         else:
-            ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY_INV)
+            if self.object_brighter_than_background:
+                ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY)
+            else:
+                ret, self.init_img_seg = cv2.threshold(self.image, self.init_tr, 1, cv2.THRESH_BINARY_INV)
 
         self.region_segmentation = copy.copy(self.init_img_seg)
 

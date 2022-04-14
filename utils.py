@@ -1,5 +1,6 @@
 import copy
 import numpy as np
+import cv2
 
 
 def dice(calculated, reference, k=1):
@@ -19,3 +20,19 @@ def add_gaussian_noise(image, s_deviation, mean=0):
         img_noise = copy.copy(image)
 
     return img_noise
+
+
+def hair_removal(image):
+    org_image = copy.copy(image)
+    kernel = cv2.getStructuringElement(1, (17, 17))
+
+    blackhat = cv2.morphologyEx(image, cv2.MORPH_BLACKHAT, kernel)
+
+    ret, thresh2 = cv2.threshold(blackhat, 10, 255, cv2.THRESH_BINARY)
+
+    return cv2.inpaint(org_image, thresh2, 1, cv2.INPAINT_TELEA)
+
+
+def image_list_ph2(beginning_of_the_path, first_image=1, last_image=25):
+    return [beginning_of_the_path + r'\IMD%03d\IMD%03d_Dermoscopic_Image\IMD%03d.bmp' % (i, i, i) for i in
+            range(first_image, last_image + 1)]

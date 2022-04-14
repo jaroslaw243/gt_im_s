@@ -39,6 +39,7 @@ class GameTheoreticFramework:
         self.init_fourier_coeffs_second_part = None
 
         if full_init:
+            self.load_image()
             self.run_full_init()
 
     @staticmethod
@@ -49,9 +50,10 @@ class GameTheoreticFramework:
 
         return [np.array(opencv_contour_array, dtype=np.int32)]
 
-    def run_full_init(self):
+    def load_image(self):
         self.image = cv2.imread(self.image_path, 0)
 
+    def run_full_init(self):
         self.init_region_segmentation()
         self.init_boundary_finding()
 

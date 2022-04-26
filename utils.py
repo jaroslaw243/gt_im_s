@@ -68,8 +68,8 @@ def make_initial_contours(input_files, input_folder, output_folder):
         kernel2 = np.ones((mask_size2, mask_size2), np.uint8)
         kernel3 = np.ones((mask_size3, mask_size3), np.uint8)
 
-        contour_dilation1 = cv2.dilate(org_contour, kernel1, iterations=1)
-        contour_erosion2 = cv2.erode(contour_dilation1, kernel2, iterations=1)
+        contour_dilation1 = cv2.dilate(org_contour, kernel1, iterations=3)
+        contour_erosion2 = cv2.erode(contour_dilation1, kernel2, iterations=2)
         contour_dilation3 = cv2.dilate(contour_erosion2, kernel3, iterations=1)
 
         cv2.imwrite(output_folder + os.path.basename(file), contour_dilation3, params=(cv2.IMWRITE_PNG_BILEVEL, 1))

@@ -61,12 +61,18 @@ class GameTheoreticFramework:
         # binary thresholding is conducted to initialize region segmentation module,
         # initial labels are saved for comparison with final result
         if self.init_tr is None:
-            if self.object_brighter_than_background:
-                ret, self.init_img_seg = cv2.threshold(self.image, 0, 1, cv2.THRESH_BINARY+cv2.THRESH_OTSU)
-            else:
-                ret, self.init_img_seg = cv2.threshold(self.image, 0, 1, cv2.THRESH_BINARY_INV+cv2.THRESH_OTSU)
+            blocksize = round(self.image.shape[0] / 4)
+            if blocksize % 2 == 0:
+                blocksize += 1
 
-            self.init_tr = round(ret)
+            if self.object_brighter_than_background:
+                self.init_img_seg = cv2.adaptiveThreshold(self.image, 1, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                                          cv2.THRESH_BINARY, blocksize, 0)
+            else:
+                self.init_img_seg = cv2.adaptiveThreshold(self.image, 1, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                                          cv2.THRESH_BINARY_INV, blocksize, 0)
+
+            self.init_tr = 0
 
         else:
             if self.object_brighter_than_background:

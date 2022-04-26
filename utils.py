@@ -1,6 +1,7 @@
 import copy
 import numpy as np
 import cv2
+import os
 
 
 def dice(calculated, reference, k=1):
@@ -54,3 +55,21 @@ def fill_image_seg_boundaries(seg):
     org_seg[comb3 == 1] = 0
 
     return org_seg
+
+
+def make_initial_contours(input_files, input_folder, output_folder):
+    for file in input_files:
+        org_contour = cv2.imread(input_folder + file, 0)
+        mask_size1 = np.random.randint(20, 51, dtype=int)
+        mask_size2 = np.random.randint(20, 31, dtype=int)
+        mask_size3 = np.random.randint(20, 81, dtype=int)
+
+        kernel1 = np.ones((mask_size1, mask_size1), np.uint8)
+        kernel2 = np.ones((mask_size2, mask_size2), np.uint8)
+        kernel3 = np.ones((mask_size3, mask_size3), np.uint8)
+
+        contour_dilation1 = cv2.dilate(org_contour, kernel1, iterations=1)
+        contour_erosion2 = cv2.erode(contour_dilation1, kernel2, iterations=1)
+        contour_dilation3 = cv2.dilate(contour_erosion2, kernel3, iterations=1)
+
+        cv2.imwrite(output_folder + os.path.basename(file), contour_dilation3, params=(cv2.IMWRITE_PNG_BILEVEL, 1))

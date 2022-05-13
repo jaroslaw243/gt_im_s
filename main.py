@@ -15,6 +15,7 @@ ref_img = cv2.imread('test_complex2.png', 0)
 with open(r'.\gt_segmentation.yaml') as file:
     gt_segmentation = yaml.load(file, Loader=yaml.Loader)
 
+gt_segmentation.load_image()
 gt_segmentation.run_full_init()
 
 filename = gt_segmentation.image_path.split(".")
@@ -30,7 +31,7 @@ cv2.drawContours(img_contour,
                                          coeffs=gt_segmentation.init_fourier_coeffs_second_part,
                                          num_points=gt_segmentation.p2c_acc)), -1, 0, 1)
 
-bounds_width = 4
+bounds_width = 0.25
 bounds_middle = gt_segmentation.init_fourier_coeffs_second_part.flatten()
 lb = bounds_middle - np.abs(bounds_middle * bounds_width)
 ub = bounds_middle + np.abs(bounds_middle * bounds_width)

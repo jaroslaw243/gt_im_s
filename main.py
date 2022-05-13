@@ -31,7 +31,7 @@ cv2.drawContours(img_contour,
                                          coeffs=gt_segmentation.init_fourier_coeffs_second_part,
                                          num_points=gt_segmentation.p2c_acc)), -1, 0, 1)
 
-bounds_width = 0.25
+bounds_width = 0.15
 bounds_middle = gt_segmentation.init_fourier_coeffs_second_part.flatten()
 lb = bounds_middle - np.abs(bounds_middle * bounds_width)
 ub = bounds_middle + np.abs(bounds_middle * bounds_width)

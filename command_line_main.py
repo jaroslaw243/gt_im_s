@@ -27,6 +27,7 @@ ref_img = cv2.imread(args.reference, 0)
 with open(args.input) as file:
     gt_segmentation = yaml.load(file, Loader=yaml.Loader)
 
+gt_segmentation.load_image()
 gt_segmentation.run_full_init()
 
 filename = gt_segmentation.image_path.split(".")

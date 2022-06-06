@@ -76,7 +76,11 @@ def hair_removal_and_fill_image_seg_boundaries(image, seg):
     comb2 = comb1 & filled_cor3[1]
     comb3 = comb2 & filled_cor4[1]
 
-    kernel = cv2.getStructuringElement(1, (17, 17))
+    # kernel with size 17x17 was working well on image with size 574x765,
+    # so for other resolutions it is scaled according to given image width
+    scale = image.shape[1] / 765
+    kernel_size = round(17 * scale)
+    kernel = cv2.getStructuringElement(1, (kernel_size, kernel_size))
 
     blackhat = cv2.morphologyEx(image, cv2.MORPH_BLACKHAT, kernel)
 

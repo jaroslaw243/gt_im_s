@@ -79,6 +79,7 @@ class GameTheoreticFramework:
     def init_boundary_finding(self):
         if isinstance(self.init_contours, str):
             et, img_cn = cv2.threshold(cv2.imread(self.init_contours, 0), 125, 1, cv2.THRESH_BINARY)
+            img_cn = cv2.resize(img_cn, (self.image.shape[1], self.image.shape[0]))
             self.contours, hierarchy = cv2.findContours(img_cn, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 
         elif isinstance(self.init_contours, list):

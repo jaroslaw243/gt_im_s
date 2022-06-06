@@ -25,7 +25,12 @@ def add_gaussian_noise(image, s_deviation, mean=0):
 
 def hair_removal(image):
     org_image = copy.copy(image)
-    kernel = cv2.getStructuringElement(1, (17, 17))
+
+    # kernel with size 17x17 was working well on image with size 574x765,
+    # so for other resolutions it is scaled according to given image width
+    scale = image.shape[1] / 765
+    kernel_size = round(17 * scale)
+    kernel = cv2.getStructuringElement(1, (kernel_size, kernel_size))
 
     blackhat = cv2.morphologyEx(image, cv2.MORPH_BLACKHAT, kernel)
 

@@ -15,5 +15,6 @@ command_line_main_hairy_noprp.py
 command_line_main_ham.py
 command_line_main_minimal_ph2.py
 statistics_inz.py
+statistics_var_params.py
 statistics_wilcoxon.py
 presentation.py

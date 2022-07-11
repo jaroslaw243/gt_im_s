@@ -2,12 +2,14 @@ import cv2
 import numpy as np
 import copy
 from pyefd import elliptic_fourier_descriptors, calculate_dc_coefficients, reconstruct_contour
+from scipy import optimize
 
 
 class GameTheoreticFramework:
     def __init__(self, image_path, clique_size, sm_const, scaling_const_alpha, scaling_const_beta,
                  max_iterations, p2c_acc, order_of_fourier_coeffs, init_contours, img_gradient_ksize, init_tr=None,
-                 region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True, full_init=True):
+                 region_seg_expected_vals_in_and_out=(1, 0), object_brighter_than_background=True,
+                 differential_evolution_bounds_width=0.55, full_init=True):
         self.max_iterations = max_iterations
         self.image_path = image_path
         self.image = None
@@ -37,6 +39,7 @@ class GameTheoreticFramework:
         self.b_cost_interlaced = None
         self.init_fourier_coeffs_first_part = None
         self.init_fourier_coeffs_second_part = None
+        self.differential_evolution_bounds_width = differential_evolution_bounds_width
 
         if full_init:
             self.load_image()
@@ -206,3 +209,33 @@ class GameTheoreticFramework:
         self.iter_num += 1
         print('Iteration nr ', self.iter_num)
         return False
+
+    def run_segmentation(self, return_region=True, return_contour=True):
+        bounds_width = self.differential_evolution_bounds_width
+        bounds_middle = self.init_fourier_coeffs_second_part.flatten()
+        lb = bounds_middle - np.abs(bounds_middle * bounds_width)
+        ub = bounds_middle + np.abs(bounds_middle * bounds_width)
+        bounds_gt = optimize.Bounds(lb, ub)
+
+        optimized_fourier_coeffs = optimize.differential_evolution(func=self.boundary_finding_interlaced,
+                                                                   bounds=bounds_gt,
+                                                                   maxiter=self.max_iterations,
+                                                                   callback=self.icm_interlaced_wrapped).x
+
+        optimized_contour = self.reconstructed_contour_to_opencv_contour(
+            reconstruct_contour(locus=self.init_fourier_coeffs_first_part,
+                                coeffs=np.reshape(optimized_fourier_coeffs, (-1, 4)),
+                                num_points=self.p2c_acc))
+
+        optimized_contour_matrix = np.zeros(self.region_segmentation.shape,
+                                            dtype=self.region_segmentation.dtype)
+        cv2.drawContours(optimized_contour_matrix, optimized_contour, -1, 1, -1)
+
+        if return_region and return_contour:
+            return self.region_segmentation, optimized_contour_matrix
+        elif return_region and not return_contour:
+            return self.region_segmentation
+        elif not return_region and return_contour:
+            return optimized_contour_matrix
+        else:
+            return None
